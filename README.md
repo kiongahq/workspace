@@ -8,7 +8,7 @@ workbench, a browser IDE, and the `kionga` workspace CLI they both carry.
 | `jupyter/` | `ghcr.io/kiongahq/jupyter` | JupyterLab with Jupyter AI, the Kionga SDK and platform modules (agents, features, realtime, pipelines), S3FS-mounted buckets, and Codex / Claude Code CLIs |
 | `ide/` | `ghcr.io/kiongahq/ide` | code-server mounting the same `/workspace`; coding-agent CLIs are opt-in (`INSTALL_CODING_AGENTS=true`) |
 | `workspace/kionga.py` | both | `kionga` CLI: project templates from one versioned catalog, generated deterministically; no credentials are read or written |
-| `workspace/directories.py` | both | Loopback sidecar for project folders and structured scaffold jobs (argv allowlist, token, no shell) |
+| `workspace/directories.py` | both | Loopback sidecar for project folders, structured scaffold jobs, and authenticated workspace-to-gateway API calls |
 
 Both images serve under a path prefix the [platform](https://github.com/kiongahq/platform)
 gateway proxies (`/workspaces/workbench/` for Jupyter); the gateway probes that path to
