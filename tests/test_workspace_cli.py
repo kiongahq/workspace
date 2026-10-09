@@ -10,8 +10,8 @@ from types import SimpleNamespace
 import pytest
 
 
-MODULE_PATH = Path(__file__).parents[2] / "deploy" / "workspace" / "kionga.py"
-REPOSITORY = MODULE_PATH.parents[2]
+MODULE_PATH = Path(__file__).parents[1] / "workspace" / "kionga.py"
+REPOSITORY = MODULE_PATH.parents[1]
 SPEC = importlib.util.spec_from_file_location("kionga_workspace", MODULE_PATH)
 assert SPEC and SPEC.loader
 kionga = importlib.util.module_from_spec(SPEC)
@@ -42,7 +42,8 @@ def generate(tmp_path: Path, template: str, **options) -> Path:
 
 def run_generated_tests(target: Path) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
-    python_paths = [str(target / "src"), str(REPOSITORY / "python")]
+    # The SDK comes from the installed package (requirements-dev.txt).
+    python_paths = [str(target / "src")]
     if environment.get("PYTHONPATH"):
         python_paths.append(environment["PYTHONPATH"])
     environment["PYTHONPATH"] = os.pathsep.join(python_paths)

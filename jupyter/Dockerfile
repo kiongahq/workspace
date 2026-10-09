@@ -1,11 +1,20 @@
 # Jupyter workbench: notebooks + a browser terminal wired into the platform.
-# Build from the repository root:
-#   docker build -f deploy/jupyter/Dockerfile -t mlaiops-jupyter .
 #
-# ML library versions are pinned to the serving image
-# (deploy/mlflow/Dockerfile: mlflow 3.1.1, scikit-learn 1.7.0) so models
-# trained in a notebook load under `mlflow models serve` without
-# training-serving skew.
+#   docker build -f jupyter/Dockerfile -t ghcr.io/kiongahq/jupyter .     # tagged releases
+#   docker build -f jupyter/Dockerfile --build-arg PLATFORM_SOURCE=local \
+#     --build-context sdk=../sdk-python \
+#     --build-context agent-runtime=../agent-runtime \
+#     --build-context pipeline-runner=../pipeline-runner -t ...:dev .   # sibling checkouts
+#
+# ML library versions are pinned to the model server image (mlflow/Dockerfile
+# in kiongahq/deploy: mlflow 3.1.1, scikit-learn 1.7.0) so models trained in a
+# notebook load under `mlflow models serve` without training-serving skew.
+
+# Empty unless overridden with --build-context <name>=<dir>.
+FROM scratch AS sdk
+FROM scratch AS agent-runtime
+FROM scratch AS pipeline-runner
+
 FROM python:3.11-slim
 
 RUN apt-get update \
@@ -37,23 +46,35 @@ RUN apt-get update \
 
 # The platform SDK and the runnable platform modules (features, realtime,
 # pipelines, agents) so notebooks and the terminal can drive the whole stack.
-COPY python/pyproject.toml /opt/platform/python/pyproject.toml
-COPY python/mlaiops_sdk /opt/platform/python/mlaiops_sdk
-COPY python/features /opt/platform/python/features
-COPY python/realtime /opt/platform/python/realtime
-COPY python/pipelines /opt/platform/python/pipelines
-COPY python/agents /opt/platform/python/agents
-RUN pip install --no-cache-dir "/opt/platform/python[agents,huggingface]"
+# PLATFORM_SOURCE is explicit so it is part of the layer cache key: a release
+# build never reuses a layer built from local checkouts.
+ARG PLATFORM_SOURCE=release
+ARG SDK_VERSION=v0.2.0
+ARG AGENT_RUNTIME_VERSION=v0.1.0
+ARG PIPELINE_RUNNER_VERSION=v0.1.0
+COPY --from=sdk / /opt/src/sdk/
+COPY --from=agent-runtime / /opt/src/agent-runtime/
+COPY --from=pipeline-runner / /opt/src/pipeline-runner/
+COPY jupyter/platform_sources.py /usr/local/lib/kionga_platform_sources.py
+RUN SDK_VERSION="$SDK_VERSION" AGENT_RUNTIME_VERSION="$AGENT_RUNTIME_VERSION" \
+    PIPELINE_RUNNER_VERSION="$PIPELINE_RUNNER_VERSION" \
+    python /usr/local/lib/kionga_platform_sources.py "$PLATFORM_SOURCE" /opt/src \
+ && pip install --no-cache-dir "/opt/src/sdk[agents,huggingface]" \
+ && mkdir -p /opt/platform/python \
+ && cp -R /opt/src/agent-runtime/agents /opt/src/agent-runtime/features \
+          /opt/src/agent-runtime/realtime /opt/src/pipeline-runner/pipelines \
+          /opt/platform/python/ \
+ && rm -rf /opt/src
 RUN pip install --no-cache-dir "jupyter-ai==3.0.1"
 # jupyter-server-proxy exposes the loopback workspace sidecar at
 # /workspaces/workbench/proxy/8890 behind the notebook token, the same way
 # code-server's /proxy/8890 does for the IDE (structured scaffold jobs).
 RUN pip install --no-cache-dir "jupyter-server-proxy==4.4.0"
 
-COPY deploy/jupyter/quickstart.ipynb /opt/seed/quickstart.ipynb
-COPY deploy/jupyter/entrypoint.sh /usr/local/bin/workbench
-COPY deploy/workspace/kionga.py /usr/local/bin/kionga
-COPY deploy/workspace/directories.py /usr/local/lib/kionga_workspace_directories.py
+COPY jupyter/quickstart.ipynb /opt/seed/quickstart.ipynb
+COPY jupyter/entrypoint.sh /usr/local/bin/workbench
+COPY workspace/kionga.py /usr/local/bin/kionga
+COPY workspace/directories.py /usr/local/lib/kionga_workspace_directories.py
 RUN chmod +x /usr/local/bin/workbench \
  && chmod +x /usr/local/bin/kionga \
  && useradd --create-home --uid 1000 dev \

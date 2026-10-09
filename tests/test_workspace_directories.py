@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-source = Path(__file__).resolve().parents[2] / "deploy/workspace/directories.py"
+source = Path(__file__).resolve().parents[1] / "workspace/directories.py"
 spec = importlib.util.spec_from_file_location("workspace_directories", source)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -41,7 +41,7 @@ import shutil  # noqa: E402
 import threading  # noqa: E402
 from http.server import ThreadingHTTPServer  # noqa: E402
 
-KIONGA = Path(__file__).resolve().parents[2] / "deploy/workspace/kionga.py"
+KIONGA = Path(__file__).resolve().parents[1] / "workspace/kionga.py"
 ARGV = ["kionga", "scaffold", "churn-model", "--template", "blank-python", "--template-version", "1.0.0",
         "--framework", "python", "--accelerator", "cpu", "--profile", "starter"]
 
