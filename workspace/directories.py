@@ -3,7 +3,7 @@
 The helper listens on loopback (127.0.0.1:8890) inside the Jupyter and IDE
 containers and is reached only through the workspace's own authenticated port
 proxy (Jupyter: /proxy/8890 behind the notebook token; code-server: /proxy/8890
-behind the IDE session). It exposes exactly two operations:
+behind the IDE session). It exposes three operation families:
 
 * ``POST /prepare-project`` creates ``/workspace/projects/<namespace>``.
 * ``POST /scaffold-jobs`` runs ``kionga scaffold`` with an argv the gateway
@@ -11,8 +11,11 @@ behind the IDE session). It exposes exactly two operations:
   allowlist of flags and a strict ASCII character class, run without a shell,
   in ``/workspace/projects``, with a scrubbed environment and a timeout. It
   additionally requires the shared job token (``X-Kionga-Workspace-Token``).
+* ``/api/v1/*`` forwards SDK/CLI requests to the internal gateway using the
+  workspace's provisioned identity, never caller-supplied cookies or tokens.
 
-It never reads files back, never accepts paths, and never runs a shell.
+It never reads workspace files back, never accepts filesystem paths, and never
+runs a shell.
 """
 
 import hmac
@@ -23,6 +26,8 @@ import shutil
 import subprocess
 import sys
 import threading
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -37,6 +42,11 @@ FILE_LIMIT = 500
 TIMEOUT_SECONDS = int(os.environ.get("KIONGA_SCAFFOLD_TIMEOUT", "60"))
 SECRET_WORDS = ("TOKEN", "SECRET", "PASSWORD", "KEY", "CREDENTIAL")
 _job_lock = threading.Lock()
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
 
 
 def prepare_project(root: Path, namespace: str) -> Path:
@@ -176,12 +186,71 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length))
 
     def do_POST(self):
-        if self.path == "/prepare-project":
+        if self.path.startswith("/api/v1/"):
+            self._proxy_api()
+        elif self.path == "/prepare-project":
             self._prepare()
         elif self.path == "/scaffold-jobs":
             self._scaffold()
         else:
             self.send_error(404)
+
+    def do_GET(self):
+        if self.path.startswith("/api/v1/"):
+            self._proxy_api()
+        else:
+            self.send_error(404)
+
+    def do_PUT(self):
+        self._proxy_api()
+
+    def do_PATCH(self):
+        self._proxy_api()
+
+    def do_DELETE(self):
+        self._proxy_api()
+
+    def _proxy_api(self):
+        """Forward workspace code to the internal gateway as its provisioned owner."""
+        if not self.path.startswith("/api/v1/") or "#" in self.path or "//" in self.path:
+            self.send_error(404)
+            return
+        upstream = os.environ.get("KIONGA_GATEWAY_INTERNAL_URL", "").rstrip("/")
+        token = os.environ.get("KIONGA_WORKSPACE_API_TOKEN", "")
+        name = os.environ.get("KIONGA_WORKSPACE_NAME", "")
+        if not upstream or not token or not name:
+            self._json(503, {"error": "Workspace API identity is not configured."})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or length > 10 * 1024 * 1024:
+                raise ValueError("Invalid request size")
+            body = self.rfile.read(length) if length else None
+            headers = {"X-Kionga-Workspace-Name": name, "X-Kionga-Workspace-Token": token}
+            for header in ("Content-Type", "Accept"):
+                if value := self.headers.get(header):
+                    headers[header] = value
+            request = urllib.request.Request(upstream + self.path, data=body, headers=headers, method=self.command)
+            # Never forward client-provided auth, cookies, or workspace credentials.
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+            try:
+                response = opener.open(request, timeout=30)
+            except urllib.error.HTTPError as error:
+                response = error
+            with response:
+                payload = response.read(20 * 1024 * 1024 + 1)
+                if len(payload) > 20 * 1024 * 1024:
+                    self.send_error(502, "Gateway response too large")
+                    return
+                self.send_response(response.status)
+                self.send_header("Content-Type", response.headers.get("Content-Type", "application/json"))
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+        except ValueError:
+            self.send_error(400, "Invalid request size")
+        except (OSError, urllib.error.URLError):
+            self._json(502, {"error": "Workspace API gateway is unavailable."})
 
     def _prepare(self):
         try:

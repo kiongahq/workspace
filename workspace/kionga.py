@@ -446,7 +446,8 @@ requested_profile: {resolved.profile}
 
 def _environment_example(resolved: ResolvedTemplate) -> str:
     values = [
-        "MLAIOPS_URL=http://gateway:8080",
+        "# Inside Kionga, use the preconfigured MLAIOPS_URL (no personal key needed).",
+        "# Outside Kionga, set MLAIOPS_URL to your gateway and MLAIOPS_TOKEN to a scoped key.",
         "MLFLOW_TRACKING_URI=http://mlflow:5000",
         "KIONGA_PROJECT_ID=replace-with-project-id",
     ]

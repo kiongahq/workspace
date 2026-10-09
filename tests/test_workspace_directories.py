@@ -158,6 +158,47 @@ def sidecar(tmp_path, monkeypatch):
     server.shutdown()
 
 
+def test_workspace_api_proxy_uses_internal_identity_not_client_auth(monkeypatch):
+    from http.server import BaseHTTPRequestHandler
+
+    observed = {}
+
+    class Gateway(BaseHTTPRequestHandler):
+        def do_GET(self):
+            observed["path"] = self.path
+            observed["name"] = self.headers.get("X-Kionga-Workspace-Name")
+            observed["token"] = self.headers.get("X-Kionga-Workspace-Token")
+            observed["authorization"] = self.headers.get("Authorization")
+            observed["cookie"] = self.headers.get("Cookie")
+            body = b'{"items":[]}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args):
+            pass
+
+    gateway = ThreadingHTTPServer(("127.0.0.1", 0), Gateway)
+    sidecar_server = ThreadingHTTPServer(("127.0.0.1", 0), module.Handler)
+    monkeypatch.setenv("KIONGA_GATEWAY_INTERNAL_URL", f"http://127.0.0.1:{gateway.server_address[1]}")
+    monkeypatch.setenv("KIONGA_WORKSPACE_API_TOKEN", "internal-only-token")
+    monkeypatch.setenv("KIONGA_WORKSPACE_NAME", "alice-ws")
+    for server in (gateway, sidecar_server):
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        connection = http.client.HTTPConnection("127.0.0.1", sidecar_server.server_address[1])
+        connection.request("GET", "/api/v1/projects", headers={"Authorization": "Bearer attacker", "Cookie": "session=attacker", "X-Kionga-Workspace-Token": "attacker"})
+        response = connection.getresponse()
+        assert response.status == 200 and json.loads(response.read()) == {"items": []}
+        assert observed == {"path": "/api/v1/projects", "name": "alice-ws", "token": "internal-only-token", "authorization": None, "cookie": None}
+        connection.close()
+    finally:
+        sidecar_server.shutdown()
+        gateway.shutdown()
+
+
 def test_sidecar_endpoint_authenticates_and_runs(sidecar, tmp_path):
     assert sidecar("/scaffold-jobs", job(), token=None)[0] == 401
     assert sidecar("/scaffold-jobs", job(), token="wrong")[0] == 401

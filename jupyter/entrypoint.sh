@@ -1,9 +1,20 @@
 #!/bin/sh
 set -e
 
-mkdir -p /home/dev/.codex /home/dev/.claude
+jupyter_state=/workspace/.kionga/jupyter
+export PYTHONUSERBASE="$jupyter_state/python-user"
+export JUPYTER_CONFIG_DIR="$jupyter_state/config"
+export JUPYTER_DATA_DIR="$jupyter_state/data"
+export JUPYTERLAB_SETTINGS_DIR="$jupyter_state/lab-settings"
+export JUPYTERLAB_WORKSPACES_DIR="$jupyter_state/lab-workspaces"
+export NPM_CONFIG_PREFIX="$jupyter_state/npm"
+export PATH="$PYTHONUSERBASE/bin:$NPM_CONFIG_PREFIX/bin:$PATH"
+mkdir -p /home/dev/.codex /home/dev/.claude /workspace/.jupyter \
+  "$PYTHONUSERBASE" "$JUPYTER_CONFIG_DIR" "$JUPYTER_DATA_DIR" \
+  "$JUPYTERLAB_SETTINGS_DIR" "$JUPYTERLAB_WORKSPACES_DIR" "$NPM_CONFIG_PREFIX"
 if [ "$(id -u)" = 0 ]; then
-  chown -R dev:dev /home/dev/.codex /home/dev/.claude
+  chown dev:dev /workspace
+  chown -R dev:dev /home/dev/.codex /home/dev/.claude /workspace/.jupyter "$jupyter_state"
   set -- runuser -u dev --
 else
   set --
@@ -57,4 +68,6 @@ exec "$@" jupyter lab \
   --ServerApp.root_dir=/workspace \
   --ServerApp.base_url=/workspaces/workbench/ \
   --ServerApp.trust_xheaders=True \
+  --ArbitraryFileIdManager.db_path=/workspace/.jupyter/file_id_manager.db \
+  --LabApp.extension_manager=readonly \
   --IdentityProvider.token="${JUPYTER_TOKEN:-mlaiops-local}"
