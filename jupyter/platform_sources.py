@@ -45,7 +45,8 @@ def extract(data: bytes, dest: Path) -> None:
 
 
 def fetch(url: str) -> bytes:
-    with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 (fixed https URL)
+    # Fixed https release URL.
+    with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310  # nosec B310
         return response.read()
 
 

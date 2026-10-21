@@ -516,7 +516,8 @@ def _pipeline_request(name: str, resolved: ResolvedTemplate) -> dict[str, Any]:
                 "environment": {
                     "KIONGA_FRAMEWORK": resolved.framework,
                     "KIONGA_ACCELERATOR": resolved.accelerator,
-                    "KIONGA_ARTIFACT_DIR": "/tmp/kionga-artifacts",
+                    # A path inside the generated container, not on this machine.
+                    "KIONGA_ARTIFACT_DIR": "/tmp/kionga-artifacts",  # nosec B108
                     "KIONGA_SERVING_IMAGE": f"ghcr.io/your-org/{name}:latest",
                 },
                 "resources": resources,
@@ -1911,7 +1912,8 @@ def api_get(path: str) -> dict[str, Any]:
     if token := os.getenv("MLAIOPS_TOKEN"):
         request.add_header("Authorization", f"Bearer {token}")
     try:
-        with urllib.request.urlopen(request, timeout=15) as response:
+        # KIONGA_URL is the control plane the user configured.
+        with urllib.request.urlopen(request, timeout=15) as response:  # nosec B310
             return json.load(response)
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", "replace")
