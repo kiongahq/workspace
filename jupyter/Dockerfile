@@ -7,7 +7,7 @@
 #     --build-context pipeline-runner=../pipeline-runner -t ...:dev .   # sibling checkouts
 #
 # ML library versions are pinned to the model server image (mlflow/Dockerfile
-# in kiongahq/deploy: mlflow 3.1.1, scikit-learn 1.7.0) so models trained in a
+# in kiongahq/deploy: mlflow 3.16.1, scikit-learn 1.7.0) so models trained in a
 # notebook load under `mlflow models serve` without training-serving skew.
 
 # Empty unless overridden with --build-context <name>=<dir>.
@@ -25,7 +25,7 @@ RUN apt-get update \
 RUN pip install --no-cache-dir \
     "jupyterlab>=4.2,<5" \
     "scikit-learn==1.7.0" \
-    "mlflow==3.1.1" \
+    "mlflow==3.16.1" \
     "pandas>=2.2" \
     "pyarrow>=16" \
     "boto3>=1.34" \
