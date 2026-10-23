@@ -1,46 +1,65 @@
 # workspace
 
-The developer workspaces of [Kionga](https://github.com/kiongahq): a shared Jupyter
-workbench, a browser IDE, and the `kionga` workspace CLI they both carry.
+[![CI](https://github.com/kiongahq/workspace/actions/workflows/ci.yml/badge.svg)](https://github.com/kiongahq/workspace/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENCE)
 
-| Path | Image | What it is |
-| --- | --- | --- |
-| `jupyter/` | `ghcr.io/kiongahq/jupyter` | JupyterLab with Jupyter AI, the Kionga SDK and platform modules (agents, features, realtime, pipelines), S3FS-mounted buckets, and Codex / Claude Code CLIs |
-| `ide/` | `ghcr.io/kiongahq/ide` | code-server mounting the same `/workspace`; coding-agent CLIs are opt-in (`INSTALL_CODING_AGENTS=true`) |
-| `workspace/kionga.py` | both | `kionga` CLI: project templates from one versioned catalog, generated deterministically; no credentials are read or written |
-| `workspace/directories.py` | both | Loopback sidecar for project folders, structured scaffold jobs, and authenticated workspace-to-gateway API calls |
+Kionga's developer workspaces: the Jupyter workbench, the browser IDE and the `kionga` project CLI.
 
-Both images serve under a path prefix the [platform](https://github.com/kiongahq/platform)
-gateway proxies (`/workspaces/workbench/` for Jupyter); the gateway probes that path to
-report readiness, and the [deploy](https://github.com/kiongahq/deploy) tests check the
-two sides agree.
+## Background
 
-## Build
+Kionga is a self-hosted platform for machine learning, data and AI agents. Each
+person on a Kionga installation works in a personal workspace that the console
+opens in the browser. This repository builds the two workspace images:
 
-The workbench bundles code from three other repositories. By default it downloads
-their tagged releases (versions are build args in `jupyter/Dockerfile`); for changes
-that span repositories, use sibling checkouts:
+- `ghcr.io/kiongahq/jupyter`: JupyterLab with Jupyter AI, the Kionga Python SDK,
+  the platform's runnable modules (agents, features, real-time, pipelines) and the
+  object store buckets mounted as folders.
+- `ghcr.io/kiongahq/ide`: a browser IDE (code-server) on the same `/workspace`
+  folder. Coding-agent CLIs are optional.
 
-```bash
-docker build -f jupyter/Dockerfile -t ghcr.io/kiongahq/jupyter .          # releases
-docker build -f jupyter/Dockerfile --build-arg PLATFORM_SOURCE=local \
-  --build-context sdk=../sdk-python \
-  --build-context agent-runtime=../agent-runtime \
-  --build-context pipeline-runner=../pipeline-runner \
-  -t ghcr.io/kiongahq/jupyter:dev .                                          # checkouts
-docker build -f ide/Dockerfile -t ghcr.io/kiongahq/ide .
-```
+Both carry the `kionga` CLI, which generates production-shaped projects from a
+versioned template catalog, and a small sidecar that lets the console create
+project folders and lets the SDK reach the platform as the workspace owner.
 
-`jupyter/platform_sources.py` does the fetching; it refuses non-tag versions, unsafe
-archive members, and mixing local with release sources.
-
-## Develop
+## Install
 
 ```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements-dev.txt     # includes CPU PyTorch for the generated-project tests
-python -m pytest -q && ruff check .
+git clone git@github.com:kiongahq/workspace.git
+cd workspace
+docker build -f jupyter/Dockerfile -t ghcr.io/kiongahq/jupyter:dev .
+docker build -f ide/Dockerfile -t ghcr.io/kiongahq/ide:dev .
 ```
 
-The CLI tests generate every template and run each generated project's own tests,
-so a template that does not work out of the box fails here.
+The [deploy](https://github.com/kiongahq/deploy) repository builds and runs both
+images with the rest of Kionga.
+
+## Usage
+
+Inside a workspace, generate a project from a template:
+
+```bash
+kionga templates                                   # list the catalog
+kionga scaffold churn --template production-ml     # creates /workspace/churn
+kionga project sync <project-id>                   # clone or update a project's Git repository
+```
+
+Templates: `production-ml`, `distributed-training`, `production-agent`,
+`fullstack-ai` and `blank-python`. Outside a workspace, run
+`python workspace/kionga.py` with `KIONGA_WORKSPACE` set to the target folder.
+
+## Documentation
+
+- Product documentation: [Jupyter workbench](https://kiongahq.github.io/docs/guides/workbench/),
+  [Browser IDE and coding agents](https://kiongahq.github.io/docs/guides/coding-workspace/)
+  and [Scaffold a project](https://kiongahq.github.io/docs/guides/scaffolding/)
+- Engineering handbook: <https://kiongahq.github.io/docs/engineering/>
+- How this repository is laid out: [ARCHITECTURE.md](ARCHITECTURE.md)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, the checks CI
+runs and the commit conventions.
+
+## License
+
+[MIT](LICENCE) © Kionga contributors
