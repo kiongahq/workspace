@@ -54,8 +54,12 @@ jobs:
             -e LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true \
             "$image"
           for attempt in {1..90}; do
-            if curl -fsS http://127.0.0.1:7860/health_check >/dev/null; then exit 0; fi
+            if curl -fsS http://127.0.0.1:7860/health_check >/dev/null; then break; fi
             sleep 2
           done
-          docker logs kionga-langflow-smoke
-          exit 1
+          if ! curl -fsS http://127.0.0.1:7860/health_check >/dev/null; then
+            docker logs kionga-langflow-smoke
+            exit 1
+          fi
+          docker exec kionga-langflow-smoke python -c \
+            'import importlib.util; p="/app/kionga-components/kionga/resources.py"; s=importlib.util.spec_from_file_location("kionga_resources", p); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); assert all(getattr(m, name).name for name in ("KiongaDatasets", "KiongaDatasetObjects", "KiongaRegisteredStorage", "KiongaRegisteredObjects", "KiongaKnowledgeSearch"))'
