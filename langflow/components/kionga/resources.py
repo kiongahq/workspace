@@ -110,6 +110,53 @@ class KiongaStorage(Component):
         return Data(data={"buckets": request("/storage/buckets")})
 
 
+class KiongaObjects(Component):
+    display_name = "Kionga Objects"
+    description = "Browse dataset and artifact objects in an authorized project bucket."
+    name = "KiongaObjects"
+    icon = "Database"
+    inputs = [
+        StrInput(name="bucket", display_name="Bucket", required=True),
+        StrInput(name="prefix", display_name="Prefix", value=""),
+    ]
+    outputs = [Output(name="objects", display_name="Objects", method="list_objects")]
+
+    def list_objects(self) -> Data:
+        query = urllib.parse.urlencode({"bucket": self.bucket, "prefix": self.prefix})
+        return Data(data=request("/storage/objects?" + query))
+
+
+class KiongaObjectText(Component):
+    display_name = "Kionga Object Text"
+    description = "Read a bounded text preview of an authorized dataset or artifact object."
+    name = "KiongaObjectText"
+    icon = "FileText"
+    inputs = [
+        StrInput(name="bucket", display_name="Bucket", required=True),
+        StrInput(name="key", display_name="Object key", required=True),
+    ]
+    outputs = [Output(name="content", display_name="Content", method="read_object")]
+
+    def read_object(self) -> Message:
+        query = urllib.parse.urlencode({"bucket": self.bucket, "key": self.key})
+        preview = request("/storage/object?" + query)
+        if preview.get("truncated"):
+            raise ValueError("Object exceeds Kionga's text preview limit")
+        return Message(text=preview.get("content", ""))
+
+
+class KiongaFeatureViews(Component):
+    display_name = "Kionga Feature Views"
+    description = "Discover authorized feature views and their metadata."
+    name = "KiongaFeatureViews"
+    icon = "Database"
+    inputs = []
+    outputs = [Output(name="features", display_name="Features", method="list_features")]
+
+    def list_features(self) -> Data:
+        return Data(data={"features": request("/features")})
+
+
 class KiongaTools(Component):
     display_name = "Kionga Tools"
     description = "Discover registered tool schemas. Invoke an executable function with Kionga Function."
