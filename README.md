@@ -3,21 +3,25 @@
 [![CI](https://github.com/kiongahq/workspace/actions/workflows/ci.yml/badge.svg)](https://github.com/kiongahq/workspace/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENCE)
 
-Kionga's developer workspaces: the Jupyter workbench, the browser IDE and the `kionga` project CLI.
+Kionga's developer workspaces: the Jupyter workbench, browser IDE, Langflow canvas, and the `kionga` project CLI.
 
 ## Background
 
 Kionga is a self-hosted platform for machine learning, data and AI agents. Each
 person on a Kionga installation works in a personal workspace that the console
-opens in the browser. This repository builds the two workspace images:
+opens in the browser. This repository builds the workspace images:
 
 - `ghcr.io/kiongahq/jupyter`: JupyterLab with Jupyter AI, the Kionga Python SDK,
   the platform's runnable modules (agents, features, real-time, pipelines) and the
   object store buckets mounted as folders.
 - `ghcr.io/kiongahq/ide`: a browser IDE (code-server) on the same `/workspace`
   folder. Coding-agent CLIs are optional.
+- `ghcr.io/kiongahq/langflow`: a project-scoped visual flow builder with Kionga
+  model, function, storage, and tool components.
+- `ghcr.io/kiongahq/langflow-sidecar`: a loopback API helper that holds the
+  workspace credential outside the Langflow process.
 
-Both carry the `kionga` CLI, which generates production-shaped projects from a
+Jupyter and the IDE carry the `kionga` CLI, which generates production-shaped projects from a
 versioned template catalog, and a small sidecar that lets the console create
 project folders and lets the SDK reach the platform as the workspace owner.
 
@@ -28,9 +32,11 @@ git clone git@github.com:kiongahq/workspace.git
 cd workspace
 docker build -f jupyter/Dockerfile -t ghcr.io/kiongahq/jupyter:dev .
 docker build -f ide/Dockerfile -t ghcr.io/kiongahq/ide:dev .
+docker build -f langflow/Dockerfile -t ghcr.io/kiongahq/langflow:dev .
+docker build -f langflow/Dockerfile.sidecar -t ghcr.io/kiongahq/langflow-sidecar:dev .
 ```
 
-The [deploy](https://github.com/kiongahq/deploy) repository builds and runs both
+The [deploy](https://github.com/kiongahq/deploy) repository builds and runs these
 images with the rest of Kionga.
 
 ## Usage
@@ -51,6 +57,7 @@ Templates: `production-ml`, `distributed-training`, `production-agent`,
 
 - Product documentation: [Jupyter workbench](https://kiongahq.github.io/docs/guides/workbench/),
   [Browser IDE and coding agents](https://kiongahq.github.io/docs/guides/coding-workspace/)
+  [Langflow canvas](https://kiongahq.github.io/docs/guides/langflow/)
   and [Scaffold a project](https://kiongahq.github.io/docs/guides/scaffolding/)
 - Engineering handbook: <https://kiongahq.github.io/docs/engineering/>
 - How this repository is laid out: [ARCHITECTURE.md](ARCHITECTURE.md)

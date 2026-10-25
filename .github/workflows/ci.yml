@@ -21,3 +21,13 @@ jobs:
     uses: kiongahq/.github/.github/workflows/image.yml@main
     permissions: {contents: read, packages: write}
     with: {image: ide, dockerfile: ide/Dockerfile}
+  langflow:
+    needs: python
+    uses: kiongahq/.github/.github/workflows/image.yml@main
+    permissions: {contents: read, packages: write}
+    with: {image: langflow, dockerfile: langflow/Dockerfile}
+  langflow-sidecar:
+    needs: python
+    uses: kiongahq/.github/.github/workflows/image.yml@main
+    permissions: {contents: read, packages: write}
+    with: {image: langflow-sidecar, dockerfile: langflow/Dockerfile.sidecar}

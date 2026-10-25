@@ -1,0 +1,6 @@
+FROM python:3.11-alpine
+RUN addgroup -g 1000 kionga && adduser -D -u 1000 -G kionga kionga
+WORKDIR /app
+COPY workspace/directories.py /app/directories.py
+USER 1000:1000
+CMD ["python", "/app/directories.py"]
