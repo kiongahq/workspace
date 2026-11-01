@@ -6,29 +6,32 @@ on:
     tags: ["v*"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   python:
-    uses: kiongahq/.github/.github/workflows/python.yml@main
+    uses: kiongahq/.github/.github/workflows/python.yml@1d0892d30e49997b7a082766e23d15ffb6ed5c1b
     with:
       install: pip install -r requirements-dev.txt
   jupyter:
     needs: python
-    uses: kiongahq/.github/.github/workflows/image.yml@main
+    uses: kiongahq/.github/.github/workflows/image.yml@1d0892d30e49997b7a082766e23d15ffb6ed5c1b
     permissions: {contents: read, packages: write}
     with: {image: jupyter, dockerfile: jupyter/Dockerfile}
   ide:
     needs: python
-    uses: kiongahq/.github/.github/workflows/image.yml@main
+    uses: kiongahq/.github/.github/workflows/image.yml@1d0892d30e49997b7a082766e23d15ffb6ed5c1b
     permissions: {contents: read, packages: write}
     with: {image: ide, dockerfile: ide/Dockerfile}
   langflow:
     needs: python
-    uses: kiongahq/.github/.github/workflows/image.yml@main
+    uses: kiongahq/.github/.github/workflows/image.yml@1d0892d30e49997b7a082766e23d15ffb6ed5c1b
     permissions: {contents: read, packages: write}
     with: {image: langflow, dockerfile: langflow/Dockerfile}
   langflow-sidecar:
     needs: python
-    uses: kiongahq/.github/.github/workflows/image.yml@main
+    uses: kiongahq/.github/.github/workflows/image.yml@1d0892d30e49997b7a082766e23d15ffb6ed5c1b
     permissions: {contents: read, packages: write}
     with: {image: langflow-sidecar, dockerfile: langflow/Dockerfile.sidecar}
   langflow-smoke:
@@ -37,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {contents: read, packages: read}
     steps:
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
