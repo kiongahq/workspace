@@ -72,9 +72,9 @@ docker build -f jupyter/Dockerfile --build-arg PLATFORM_SOURCE=local \
 docker build -f ide/Dockerfile -t ghcr.io/kiongahq/ide:dev .
 ```
 
-After CI passes on pushes to `main` and on `v*` tags, the shared image workflow
+After CI passes on pushes to `main` and published releases, the shared image workflow
 publishes `ghcr.io/kiongahq/jupyter` and `ghcr.io/kiongahq/ide`, tagged
-`sha-<short>`, `latest` (from `main`) and the semantic version (from tags). Pull
+`sha-<short>`, `edge` (from `main`) and exact published release versions. Pull
 requests build both images without publishing them.
 
 ## Version alignment
@@ -125,3 +125,16 @@ exact finding, so any new secret still fails the scan.
 
 By contributing, you agree that your contributions are licensed under the
 [MIT License](LICENCE).
+
+## Release automation
+
+Configure `RELEASE_PLEASE_TOKEN` with Contents, Issues and Pull requests write
+permissions scoped to the participating repositories. Release PRs require
+independent review and all required checks; no bypass is granted to automation.
+The workflow reports an error until this credential is configured.
+
+Use reviewed `vX.Y.Z` releases, keep published tags and packages immutable, and
+pin container digests in deployments. Development builds use `edge` and SHA
+references; existing `latest` aliases stop updating. The
+[release handbook](https://kiongahq.github.io/docs/engineering/contributing/releases/)
+covers publication, dependency updates and rollback.
