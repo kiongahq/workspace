@@ -1,9 +1,10 @@
 name: CI
 
 on:
+  release:
+    types: [published]
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -11,7 +12,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   python:
@@ -20,26 +21,26 @@ jobs:
       install: pip install -r requirements-dev.txt
   jupyter:
     needs: python
-    uses: kiongahq/.github/.github/workflows/image.yml@76e4fed230c4f0b89b1bcf884df60e5b2fffca67
-    permissions: {contents: read, packages: write}
+    uses: kiongahq/.github/.github/workflows/image.yml@717e2cc3be707aff75c717662c6b3fea58ab56d8
+    permissions: {contents: write, packages: write}
     with: {image: jupyter, dockerfile: jupyter/Dockerfile}
   ide:
     needs: python
-    uses: kiongahq/.github/.github/workflows/image.yml@76e4fed230c4f0b89b1bcf884df60e5b2fffca67
-    permissions: {contents: read, packages: write}
+    uses: kiongahq/.github/.github/workflows/image.yml@717e2cc3be707aff75c717662c6b3fea58ab56d8
+    permissions: {contents: write, packages: write}
     with: {image: ide, dockerfile: ide/Dockerfile}
   langflow:
     needs: python
-    uses: kiongahq/.github/.github/workflows/image.yml@76e4fed230c4f0b89b1bcf884df60e5b2fffca67
-    permissions: {contents: read, packages: write}
+    uses: kiongahq/.github/.github/workflows/image.yml@717e2cc3be707aff75c717662c6b3fea58ab56d8
+    permissions: {contents: write, packages: write}
     with: {image: langflow, dockerfile: langflow/Dockerfile}
   langflow-sidecar:
     needs: python
-    uses: kiongahq/.github/.github/workflows/image.yml@76e4fed230c4f0b89b1bcf884df60e5b2fffca67
-    permissions: {contents: read, packages: write}
+    uses: kiongahq/.github/.github/workflows/image.yml@717e2cc3be707aff75c717662c6b3fea58ab56d8
+    permissions: {contents: write, packages: write}
     with: {image: langflow-sidecar, dockerfile: langflow/Dockerfile.sidecar}
   langflow-smoke:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.event_name != 'release' || !github.event.release.prerelease)
     needs: langflow
     runs-on: ubuntu-latest
     permissions: {contents: read, packages: read}
@@ -50,10 +51,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Start Langflow canvas and check health
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         shell: bash
         run: |
           set -euo pipefail
           image="ghcr.io/kiongahq/langflow:sha-${GITHUB_SHA::7}"
+          if [ -n "$RELEASE_TAG" ]; then image="${image%:*}:${RELEASE_TAG#v}"; fi
           docker pull "$image"
           docker run -d --name kionga-langflow-smoke -p 127.0.0.1:7860:7860 \
             -e LANGFLOW_HOST=0.0.0.0 \
