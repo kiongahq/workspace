@@ -150,7 +150,7 @@ def test_each_bucket_mounts_only_the_workspace_prefix_with_private_modes(tmp_pat
     result, calls = run_entrypoint(tmp_path, S3_MOUNT_PREFIX="/projects/churn/", **MOUNTS)
     assert result.returncode == 0, result.stderr
     root = tmp_path / "object-store"
-    options = ["-o", "url=http://objectstore:9000", "-o", "use_path_request_style",
+    options = ["-o", "url=http://objectstore:9000", "-o", "use_path_request_style", "-o", "compat_dir",
                "-o", f"passwd_file={tmp_path / 's3fs-passwd'}", "-o", "default_permissions",
                "-o", "uid=1000", "-o", "gid=1000", "-o", "umask=0077"]
     assert _s3fs_calls(calls) == [

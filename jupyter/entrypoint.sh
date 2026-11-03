@@ -88,10 +88,13 @@ else
     target="$mount_root/$bucket"
     mkdir -p "$target"
     if ! mountpoint -q "$target"; then
+      # compat_dir is required: without it s3fs 1.95 exits 0 and then silently
+      # never mounts bucket:/prefix, even when objects exist under the prefix.
       # shellcheck disable=SC2086 # $access is zero or two words on purpose
       s3fs "$bucket:/$mount_prefix" "$target" \
         -o "url=${S3_ENDPOINT}" \
         -o use_path_request_style \
+        -o compat_dir \
         -o "passwd_file=${credentials}" \
         $access \
         -o default_permissions \
