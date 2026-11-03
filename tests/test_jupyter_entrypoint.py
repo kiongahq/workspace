@@ -17,6 +17,8 @@ import pytest
 ENTRYPOINT = Path(__file__).resolve().parents[1] / "jupyter/entrypoint.sh"
 STUBS = ("mkdir", "id", "chown", "runuser", "mountpoint", "s3fs", "chmod", "cp", "env", "python3", "jupyter")
 STRONG_TOKEN = "".join(["0123456789abcdef"] * 3)
+# CI runs dash as /bin/sh; set this to try another POSIX shell locally.
+SHELL = os.environ.get("ENTRYPOINT_TEST_SHELL", "/bin/sh")
 
 
 def _write_stub(directory: Path, name: str, log: Path) -> None:
@@ -29,9 +31,11 @@ def _write_stub(directory: Path, name: str, log: Path) -> None:
     script = directory / name
     script.write_text(
         "#!/bin/sh\n"
-        f"printf '%s' '{name}' >> '{log}'\n"
-        f"for argument in \"$@\"; do printf '\\037%s' \"$argument\" >> '{log}'; done\n"
-        f"printf '\\n' >> '{log}'\n" + body
+        # One write per call: the sidecar stub runs in the background, so
+        # several appends would interleave with the jupyter stub's record.
+        f"line='{name}'\n"
+        "for argument in \"$@\"; do line=\"$line$(printf '\\037')$argument\"; done\n"
+        f"printf '%s\\n' \"$line\" >> '{log}'\n" + body
     )
     script.chmod(script.stat().st_mode | stat.S_IXUSR)
 
@@ -53,7 +57,7 @@ def run_entrypoint(tmp_path: Path, **environment: str):
         "S3_MOUNT_ROOT": str(tmp_path / "object-store"),
     }
     env.update(environment)
-    result = subprocess.run(["/bin/sh", str(ENTRYPOINT)], env=env, capture_output=True, text=True, timeout=30)
+    result = subprocess.run([SHELL, str(ENTRYPOINT)], env=env, capture_output=True, text=True, timeout=30)
     calls = [line.split("\x1f") for line in log.read_text().splitlines() if line]
     return result, calls
 
