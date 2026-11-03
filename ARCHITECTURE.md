@@ -70,7 +70,11 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
   under `/workspace/.kionga/jupyter` so they persist, mounts the object store
   buckets under `/workspace/object-store` with s3fs when `S3_ENDPOINT` and
   `/dev/fuse` are present, seeds `quickstart.ipynb` once, starts the sidecar and
-  launches JupyterLab with `JUPYTER_TOKEN`.
+  launches JupyterLab with `JUPYTER_TOKEN`. It fails closed first: an unset token,
+  the old `mlaiops-local` default or one shorter than 32 characters stops the
+  container, unless `KIONGA_ALLOW_INSECURE_LOCAL=true`, which then binds to
+  `127.0.0.1`. `tests/test_jupyter_entrypoint.py` runs the script with every
+  external command stubbed on `PATH`.
 - `quickstart.ipynb`: the seed notebook.
 
 ### `ide/`

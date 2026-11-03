@@ -59,6 +59,9 @@ The deployment sets these in each workspace container:
 
 | Variable | Image | Required | Purpose |
 | --- | --- | --- | --- |
+| `JUPYTER_TOKEN` | Jupyter | Yes | JupyterLab login token, at least 32 random characters. The gateway proxies with the same value (`KIONGA_JUPYTER_TOKEN`). The container exits at startup when it is unset, shorter, or the old `mlaiops-local` default. |
+| `KIONGA_ALLOW_INSECURE_LOCAL` | Jupyter | No | `true` accepts a weak or empty `JUPYTER_TOKEN` on a single-user machine and binds JupyterLab to `127.0.0.1` only, so the platform gateway cannot reach it. Never set it on a shared host. |
+| `KIONGA_JUPYTER_TRUST_XHEADERS` | Jupyter | No | Default `true`: JupyterLab trusts `X-Forwarded-*` headers because the platform gateway is the only ingress. Set `false` when anything else can reach port 8888. |
 | `KIONGA_WORKSPACE_JOB_TOKEN` | Jupyter, IDE | For scaffold jobs | Random value of at least 32 bytes that the gateway sends with `POST /scaffold-jobs`. Unset or shorter values disable scaffold jobs (HTTP 503). It is separate from the login credentials: `JUPYTER_TOKEN` and `PASSWORD` never authorize jobs. |
 
 ## Documentation
