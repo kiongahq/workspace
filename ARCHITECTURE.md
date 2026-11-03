@@ -67,8 +67,10 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
   archives (`release`) or from BuildKit named contexts (`local`). It refuses
   non-tag versions, unsafe archive members and a mix of the two modes.
 - `entrypoint.sh`: keeps Jupyter settings, user-installed Python and npm tools
-  under `/workspace/.kionga/jupyter` so they persist, mounts the object store
-  buckets under `/workspace/object-store` with s3fs when `S3_ENDPOINT` and
+  under `/workspace/.kionga/jupyter` so they persist, mounts this workspace's
+  prefix (`S3_MOUNT_PREFIX`, as `bucket:/<prefix>`, never a whole bucket) of each
+  object store bucket under `/workspace/object-store` with s3fs, as uid 1000 with
+  `umask=0077` and `default_permissions`, when `S3_ENDPOINT` and
   `/dev/fuse` are present, seeds `quickstart.ipynb` once, starts the sidecar and
   launches JupyterLab with `JUPYTER_TOKEN`. It fails closed first: an unset token,
   the old `mlaiops-local` default or one shorter than 32 characters stops the

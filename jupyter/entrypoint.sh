@@ -47,34 +47,60 @@ fi
 
 mount_root="${S3_MOUNT_ROOT:-/workspace/object-store}"
 mount_buckets="${S3_MOUNT_BUCKETS:-mlaiops-models mlaiops-artifacts mlaiops-features mlaiops-traces mlaiops-agents mlaiops-pipeline-logs}"
+# Each bucket is mounted at this workspace's own prefix (bucket:/prefix), never
+# whole: the credentials are expected to reach that prefix only. Leading and
+# trailing slashes are ignored.
+mount_prefix="${S3_MOUNT_PREFIX:-}"
+while [ "${mount_prefix#/}" != "$mount_prefix" ]; do mount_prefix="${mount_prefix#/}"; done
+while [ "${mount_prefix%/}" != "$mount_prefix" ]; do mount_prefix="${mount_prefix%/}"; done
+
+skip_mounts() {
+  echo "$1" >&2
+  if [ "${S3_MOUNT_OPTIONAL:-false}" != "true" ]; then
+    exit 1
+  fi
+  echo "Continuing with the persistent /workspace volume; object storage remains available through the platform API." >&2
+}
 
 fuse_device="${KIONGA_FUSE_DEVICE:-/dev/fuse}"
-if [ -n "${S3_ENDPOINT:-}" ] && [ -e "$fuse_device" ]; then
+if [ -z "${S3_ENDPOINT:-}" ] || [ ! -e "$fuse_device" ]; then
+  skip_mounts "Object-store filesystem mount requires S3_ENDPOINT and /dev/fuse"
+elif [ -z "$mount_prefix" ]; then
+  skip_mounts "Object-store filesystem mount requires S3_MOUNT_PREFIX, this workspace's own prefix in each bucket (for example projects/<namespace>); refusing to mount whole buckets."
+else
+  case "$mount_prefix" in
+    *[!A-Za-z0-9._/-]* | . | .. | ./* | ../* | */. | */.. | */./* | */../* | *//*)
+      echo "S3_MOUNT_PREFIX may contain only letters, digits, '.', '_', '-' and '/' separators, with no '.' or '..' segments." >&2
+      exit 1 ;;
+  esac
   credentials="${KIONGA_S3FS_PASSWD_FILE:-/run/s3fs-passwd}"
   printf '%s:%s\n' "${AWS_ACCESS_KEY_ID}" "${AWS_SECRET_ACCESS_KEY}" > "$credentials"
   chmod 600 "$credentials"
+  # Files belong to the workspace user (uid 1000) with mode 0700/0600 and the
+  # kernel enforces it. Root mounts on dev's behalf, which needs allow_other.
+  if [ "$(id -u)" = 0 ]; then
+    access="-o allow_other"
+  else
+    access=""
+  fi
   mkdir -p "$mount_root"
   for bucket in $mount_buckets; do
     target="$mount_root/$bucket"
     mkdir -p "$target"
     if ! mountpoint -q "$target"; then
-      s3fs "$bucket" "$target" \
+      # shellcheck disable=SC2086 # $access is zero or two words on purpose
+      s3fs "$bucket:/$mount_prefix" "$target" \
         -o "url=${S3_ENDPOINT}" \
         -o use_path_request_style \
         -o "passwd_file=${credentials}" \
-        -o allow_other \
+        $access \
+        -o default_permissions \
         -o uid=1000 \
         -o gid=1000 \
-        -o umask=0022
+        -o umask=0077
     fi
   done
   chown dev:dev "$mount_root"
-else
-  echo "Object-store filesystem mount requires S3_ENDPOINT and /dev/fuse" >&2
-  if [ "${S3_MOUNT_OPTIONAL:-false}" != "true" ]; then
-    exit 1
-  fi
-  echo "Continuing with the persistent /workspace volume; object storage remains available through the platform API." >&2
 fi
 
 # Seed the quickstart once; everything under /workspace persists in the
