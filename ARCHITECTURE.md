@@ -48,7 +48,9 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
   gateway built. `validate_job` re-checks it against a fixed flag allowlist and a
   strict character class; `run_scaffold` runs it without a shell, with a scrubbed
   environment and a timeout (`KIONGA_SCAFFOLD_TIMEOUT`, default 60 seconds). The
-  request must carry the shared job token.
+  request must carry the job token from `KIONGA_WORKSPACE_JOB_TOKEN` (at least 32
+  bytes; `expected_token`). The editor login credentials (`JUPYTER_TOKEN`,
+  `PASSWORD`) never stand in for it, so the two rotate separately.
 - `/api/v1/*` forwards SDK and CLI calls to the gateway's internal workspace
   listener (`KIONGA_GATEWAY_INTERNAL_URL`) with the workspace's provisioned
   identity (`X-Kionga-Workspace-Name` and `X-Kionga-Workspace-Token`). It never

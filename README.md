@@ -53,6 +53,14 @@ Templates: `production-ml`, `distributed-training`, `production-agent`,
 `fullstack-ai` and `blank-python`. Outside a workspace, run
 `python workspace/kionga.py` with `KIONGA_WORKSPACE` set to the target folder.
 
+## Configuration
+
+The deployment sets these in each workspace container:
+
+| Variable | Image | Required | Purpose |
+| --- | --- | --- | --- |
+| `KIONGA_WORKSPACE_JOB_TOKEN` | Jupyter, IDE | For scaffold jobs | Random value of at least 32 bytes that the gateway sends with `POST /scaffold-jobs`. Unset or shorter values disable scaffold jobs (HTTP 503). It is separate from the login credentials: `JUPYTER_TOKEN` and `PASSWORD` never authorize jobs. |
+
 ## Documentation
 
 - Product documentation: [Jupyter workbench](https://kiongahq.github.io/docs/guides/workbench/),

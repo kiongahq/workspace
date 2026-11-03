@@ -10,7 +10,8 @@ behind the IDE session). It exposes three operation families:
   built from the stored project. The argv is re-validated here against a fixed
   allowlist of flags and a strict ASCII character class, run without a shell,
   in ``/workspace/projects``, with a scrubbed environment and a timeout. It
-  additionally requires the shared job token (``X-Kionga-Workspace-Token``).
+  additionally requires the job token (``X-Kionga-Workspace-Token``), which
+  only ``KIONGA_WORKSPACE_JOB_TOKEN`` supplies, never a login credential.
 * ``/api/v1/*`` forwards SDK/CLI requests to the internal gateway using the
   workspace's provisioned identity, never caller-supplied cookies or tokens.
 
@@ -158,10 +159,32 @@ def run_scaffold(root: Path, payload: object, cli: str | None = None, timeout: i
     }
 
 
+JOB_TOKEN_VARIABLE = "KIONGA_WORKSPACE_JOB_TOKEN"
+MIN_JOB_TOKEN_BYTES = 32
+
+
 def expected_token() -> str:
-    for name in ("KIONGA_WORKSPACE_JOB_TOKEN", "JUPYTER_TOKEN", "PASSWORD"):
-        if value := os.environ.get(name, ""):
-            return value
+    """The scaffold job token, or "" when scaffold jobs are disabled.
+
+    Only KIONGA_WORKSPACE_JOB_TOKEN counts. The Jupyter token and the IDE
+    password are browser login credentials; reusing them would let a leaked
+    login also run jobs and would stop the two from rotating separately. A
+    token shorter than MIN_JOB_TOKEN_BYTES is treated as unset.
+    """
+    value = os.environ.get(JOB_TOKEN_VARIABLE, "")
+    if len(value.encode()) < MIN_JOB_TOKEN_BYTES:
+        return ""
+    return value
+
+
+def job_token_warning() -> str:
+    """Startup warning when scaffold jobs are disabled, else ""."""
+    value = os.environ.get(JOB_TOKEN_VARIABLE, "")
+    if not value:
+        return f"kionga-workspace: {JOB_TOKEN_VARIABLE} is not set; scaffold jobs are disabled."
+    if len(value.encode()) < MIN_JOB_TOKEN_BYTES:
+        return (f"kionga-workspace: {JOB_TOKEN_VARIABLE} is shorter than {MIN_JOB_TOKEN_BYTES} bytes; "
+                "scaffold jobs are disabled.")
     return ""
 
 
@@ -265,7 +288,8 @@ class Handler(BaseHTTPRequestHandler):
     def _scaffold(self):
         expected = expected_token()
         if not expected:
-            self._json(503, {"error": "Scaffold jobs are disabled: set KIONGA_WORKSPACE_JOB_TOKEN in this workspace."})
+            self._json(503, {"error": f"Scaffold jobs are disabled: set {JOB_TOKEN_VARIABLE} (at least "
+                                      f"{MIN_JOB_TOKEN_BYTES} bytes) in this workspace."})
             return
         provided = self.headers.get("X-Kionga-Workspace-Token", "")
         if not hmac.compare_digest(provided.encode(), expected.encode()):
@@ -293,4 +317,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    if warning := job_token_warning():
+        sys.stderr.write(warning + "\n")
     ThreadingHTTPServer(("127.0.0.1", int(os.environ.get("KIONGA_SIDECAR_PORT", "8890"))), Handler).serve_forever()
