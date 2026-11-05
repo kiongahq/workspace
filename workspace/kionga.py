@@ -1391,17 +1391,23 @@ def project_status(project_id: str) -> dict[str, str]:
 
 
 def remember_project_fact(project_id: str, fact: str) -> None:
-    """Persist long-term memory only when the platform memory DSN is configured."""
+    """Persist a fact about the project, not about a person.
+
+    It is agent-wide memory: any user of this agent can read it with
+    recall(scope="agent"), so never store personal data here. For a user's own
+    memory, pass the authenticated user as AgentMemoryClient(..., user_id=...).
+    Needs the platform memory DSN.
+    """
     from mlaiops_sdk.agents import AgentMemoryClient
 
-    with AgentMemoryClient("project-agent", session_id=project_id) as memory:
-        memory.remember(fact, metadata={"project_id": project_id})
+    with AgentMemoryClient("project-agent") as memory:
+        memory.remember(fact, metadata={"project_id": project_id}, scope="agent")
 '''
     test = f'''from langchain_core.messages import AIMessage
 
 from {package}.agent import build
 from {package}.runtime import health
-from {package}.tools import project_status
+from {package}.tools import project_status, remember_project_fact
 
 
 class DeterministicModel:
@@ -1415,6 +1421,33 @@ class DeterministicModel:
 def test_health_and_tool_contract():
     assert health() == {{"status": "ok"}}
     assert project_status.invoke({{"project_id": "prj-1"}})["project_id"] == "prj-1"
+
+
+def test_project_facts_are_explicitly_agent_wide_memory(monkeypatch):
+    import mlaiops_sdk.agents as agents
+
+    stored = []
+
+    class UserScopedMemory:
+        """The SDK's contract: memory without a user must opt in to agent scope."""
+
+        def __init__(self, agent_name, session_id="", *, user_id=None):
+            self.user_id = user_id
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def remember(self, text, *, metadata=None, scope="user"):
+            if scope != "agent" and not self.user_id:
+                raise RuntimeError("remember needs the authenticated user")
+            stored.append((text, metadata, scope))
+
+    monkeypatch.setattr(agents, "AgentMemoryClient", UserScopedMemory)
+    remember_project_fact("prj-1", "uses postgres")
+    assert stored == [("uses postgres", {{"project_id": "prj-1"}}, "agent")]
 
 
 def test_graph_is_deterministic_with_injected_model():

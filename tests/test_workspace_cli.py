@@ -384,6 +384,43 @@ def test_generated_agent_project_tests_pass_offline(
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_generated_memory_helper_satisfies_the_user_scoped_sdk(tmp_path, monkeypatch) -> None:
+    """Runs against the real client once the SDK pin has user-scoped memory."""
+    import inspect
+
+    agents = pytest.importorskip("mlaiops_sdk.agents")
+    real = agents.AgentMemoryClient
+    signature = inspect.signature(real.remember)
+    if "scope" not in signature.parameters:
+        pytest.skip("this SDK predates user-scoped memory")
+
+    target = generate(tmp_path, "production-agent")
+    (tools_path,) = target.glob("src/*/tools.py")
+    spec = importlib.util.spec_from_file_location("generated_tools", tools_path)
+    tools = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tools)
+    stored = []
+
+    class Recording(real):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def remember(self, text, **options):
+            bound = signature.bind(self, text, **options)
+            bound.apply_defaults()
+            # The SDK's own guard: raises when the scope needs a user it lacks.
+            self._scope_parameters(bound.arguments["scope"], "remember")
+            stored.append(options)
+
+    monkeypatch.setattr(agents, "AgentMemoryClient", Recording)
+    monkeypatch.setenv("MLAIOPS_AGENT_MEMORY_DSN", "postgresql://unused")
+    tools.remember_project_fact("prj-1", "uses postgres")
+    assert stored == [{"metadata": {"project_id": "prj-1"}, "scope": "agent"}]
+
+
 def test_fullstack_ai_defaults_to_ml_browser_client(tmp_path: Path) -> None:
     target = generate(tmp_path, "fullstack-ai")
 

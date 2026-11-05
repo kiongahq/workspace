@@ -48,7 +48,9 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
   gateway built. `validate_job` re-checks it against a fixed flag allowlist and a
   strict character class; `run_scaffold` runs it without a shell, with a scrubbed
   environment and a timeout (`KIONGA_SCAFFOLD_TIMEOUT`, default 60 seconds). The
-  request must carry the shared job token.
+  request must carry the job token from `KIONGA_WORKSPACE_JOB_TOKEN` (at least 32
+  bytes; `expected_token`). The editor login credentials (`JUPYTER_TOKEN`,
+  `PASSWORD`) never stand in for it, so the two rotate separately.
 - `/api/v1/*` forwards SDK and CLI calls to the gateway's internal workspace
   listener (`KIONGA_GATEWAY_INTERNAL_URL`) with the workspace's provisioned
   identity (`X-Kionga-Workspace-Name` and `X-Kionga-Workspace-Token`). It never
@@ -65,10 +67,17 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
   archives (`release`) or from BuildKit named contexts (`local`). It refuses
   non-tag versions, unsafe archive members and a mix of the two modes.
 - `entrypoint.sh`: keeps Jupyter settings, user-installed Python and npm tools
-  under `/workspace/.kionga/jupyter` so they persist, mounts the object store
-  buckets under `/workspace/object-store` with s3fs when `S3_ENDPOINT` and
+  under `/workspace/.kionga/jupyter` so they persist, mounts this workspace's
+  prefix (`S3_MOUNT_PREFIX`, as `bucket:/<prefix>`, never a whole bucket) of each
+  object store bucket under `/workspace/object-store` with s3fs, as uid 1000 with
+  `umask=0077`, `default_permissions` and `compat_dir` (required for a prefix mount
+  in s3fs 1.95), when `S3_ENDPOINT` and
   `/dev/fuse` are present, seeds `quickstart.ipynb` once, starts the sidecar and
-  launches JupyterLab with `JUPYTER_TOKEN`.
+  launches JupyterLab with `JUPYTER_TOKEN`. It fails closed first: an unset token,
+  the old `mlaiops-local` default or one shorter than 32 characters stops the
+  container, unless `KIONGA_ALLOW_INSECURE_LOCAL=true`, which then binds to
+  `127.0.0.1`. `tests/test_jupyter_entrypoint.py` runs the script with every
+  external command stubbed on `PATH`.
 - `quickstart.ipynb`: the seed notebook.
 
 ### `ide/`
