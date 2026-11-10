@@ -14,7 +14,7 @@ if [ "${KIONGA_ALLOW_INSECURE_LOCAL:-false}" = "true" ]; then
 elif [ -z "$jupyter_token" ]; then
   echo "JUPYTER_TOKEN is not set. Set it to a random value of at least 32 characters (for example: openssl rand -hex 24)." >&2
   exit 1
-elif [ "$jupyter_token" = "mlaiops-local" ] || [ "${#jupyter_token}" -lt 32 ]; then
+elif [ "$jupyter_token" = "kionga-local" ] || [ "${#jupyter_token}" -lt 32 ]; then
   echo "JUPYTER_TOKEN is too weak: use a random value of at least 32 characters, not a shared default." >&2
   exit 1
 fi
@@ -46,7 +46,7 @@ else
 fi
 
 mount_root="${S3_MOUNT_ROOT:-/workspace/object-store}"
-mount_buckets="${S3_MOUNT_BUCKETS:-mlaiops-models mlaiops-artifacts mlaiops-features mlaiops-traces mlaiops-agents mlaiops-pipeline-logs}"
+mount_buckets="${S3_MOUNT_BUCKETS:-kionga-models kionga-artifacts kionga-features kionga-traces kionga-agents kionga-pipeline-logs}"
 # Each bucket is mounted at this workspace's own prefix (bucket:/prefix), never
 # whole: the credentials are expected to reach that prefix only. Leading and
 # trailing slashes are ignored.

@@ -308,7 +308,7 @@ def test_agent_templates_generate_graph_runtime_evals_and_manifest(
     assert "NotImplementedError" not in graph
     assert "checkpointer=checkpointer" in graph
     assert "from langgraph.graph.message import MessagesState" in graph
-    assert 'os.getenv("MLAIOPS_LLM_BACKEND", "mock")' in graph
+    assert 'os.getenv("KIONGA_LLM_BACKEND", "mock")' in graph
     runtime = (target / f"src/{package}/runtime.py").read_text()
     assert '@app.post("/invoke")' in runtime
     assert '@app.get("/healthz")' in runtime
@@ -324,7 +324,7 @@ def test_agent_templates_generate_graph_runtime_evals_and_manifest(
     assert f"requests:\n      {resource_values}" in manifest
     assert f"limits:\n      {resource_values}" in manifest
     environment = (target / ".env.example").read_text()
-    assert "MLAIOPS_LLM_BACKEND=mock" in environment
+    assert "KIONGA_LLM_BACKEND=mock" in environment
     request = json.loads((target / "platform/agent.json").read_text())
     assert request == {
         "project_id": "replace-with-project-id",
@@ -388,7 +388,7 @@ def test_generated_memory_helper_satisfies_the_user_scoped_sdk(tmp_path, monkeyp
     """Runs against the real client once the SDK pin has user-scoped memory."""
     import inspect
 
-    agents = pytest.importorskip("mlaiops_sdk.agents")
+    agents = pytest.importorskip("kionga.agents")
     real = agents.AgentMemoryClient
     signature = inspect.signature(real.remember)
     if "scope" not in signature.parameters:
@@ -416,7 +416,7 @@ def test_generated_memory_helper_satisfies_the_user_scoped_sdk(tmp_path, monkeyp
             stored.append(options)
 
     monkeypatch.setattr(agents, "AgentMemoryClient", Recording)
-    monkeypatch.setenv("MLAIOPS_AGENT_MEMORY_DSN", "postgresql://unused")
+    monkeypatch.setenv("KIONGA_AGENT_MEMORY_DSN", "postgresql://unused")
     tools.remember_project_fact("prj-1", "uses postgres")
     assert stored == [{"metadata": {"project_id": "prj-1"}, "scope": "agent"}]
 

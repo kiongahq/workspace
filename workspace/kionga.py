@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 WORKSPACE = Path(os.getenv("KIONGA_WORKSPACE", "/workspace")).resolve()
-KIONGA_URL = os.getenv("MLAIOPS_URL", "http://gateway:8080").rstrip("/")
+KIONGA_URL = os.getenv("KIONGA_URL", "http://gateway:8080").rstrip("/")
 CATALOG_API_VERSION = "kionga.io/v1"
 CATALOG_VERSION = "2026.1"
 
@@ -321,7 +321,7 @@ def dependencies_for(resolved: ResolvedTemplate) -> list[str]:
                 "fastapi>=0.115,<1",
                 "langchain-core>=1.0,<2",
                 "langgraph>=1.0,<2",
-                "mlaiops-sdk[agents]>=0.2,<1",
+                "kionga[agents]>=0.2,<1",
                 "pydantic>=2.7,<3",
                 "uvicorn[standard]>=0.34,<1",
             ]
@@ -446,8 +446,8 @@ requested_profile: {resolved.profile}
 
 def _environment_example(resolved: ResolvedTemplate) -> str:
     values = [
-        "# Inside Kionga, use the preconfigured MLAIOPS_URL (no personal key needed).",
-        "# Outside Kionga, set MLAIOPS_URL to your gateway and MLAIOPS_TOKEN to a scoped key.",
+        "# Inside Kionga, use the preconfigured KIONGA_URL (no personal key needed).",
+        "# Outside Kionga, set KIONGA_URL to your gateway and KIONGA_TOKEN to a scoped key.",
         "MLFLOW_TRACKING_URI=http://mlflow:5000",
         "KIONGA_PROJECT_ID=replace-with-project-id",
     ]
@@ -457,8 +457,8 @@ def _environment_example(resolved: ResolvedTemplate) -> str:
     ):
         values.extend(
             [
-                "MLAIOPS_LLM_BACKEND=mock",
-                "MLAIOPS_CHECKPOINT_DSN=",
+                "KIONGA_LLM_BACKEND=mock",
+                "KIONGA_CHECKPOINT_DSN=",
                 "LANGFUSE_PUBLIC_KEY=",
                 "LANGFUSE_SECRET_KEY=",
             ]
@@ -580,7 +580,7 @@ def _agent_manifest(name: str, package: str, resolved: ResolvedTemplate) -> str:
     limits:
 {resource_lines}
 '''
-    return f'''apiVersion: mlaiops.io/v1alpha1
+    return f'''apiVersion: kionga.dev/v1alpha1
 kind: KiongaAgent
 metadata:
   name: {name}
@@ -862,7 +862,7 @@ def publish_model(model, artifact: Path, metrics: dict[str, float]) -> str:
 
 
 def register(metrics: dict[str, float], artifact_uri: str) -> None:
-    gateway, project_id = os.getenv("MLAIOPS_URL"), os.getenv("KIONGA_PROJECT_ID")
+    gateway, project_id = os.getenv("KIONGA_URL"), os.getenv("KIONGA_PROJECT_ID")
     if not gateway or not project_id or project_id == "replace-with-project-id":
         return
     import httpx
@@ -1028,7 +1028,7 @@ from {package} import train as training
 
 def test_training_artifact_drives_online_predictions(tmp_path, monkeypatch):
     monkeypatch.setenv("KIONGA_ACCELERATOR", "cpu")
-    monkeypatch.delenv("MLAIOPS_URL", raising=False)
+    monkeypatch.delenv("KIONGA_URL", raising=False)
     monkeypatch.delenv("KIONGA_PROJECT_ID", raising=False)
     monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
     monkeypatch.delenv("KIONGA_MODEL_URI", raising=False)
@@ -1114,7 +1114,7 @@ def test_run_registers_the_logged_model_uri(tmp_path, monkeypatch):
 def test_model_uri_loads_the_logged_mlflow_flavor(tmp_path, monkeypatch):
     monkeypatch.setenv("KIONGA_ACCELERATOR", "cpu")
     monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
-    monkeypatch.delenv("MLAIOPS_URL", raising=False)
+    monkeypatch.delenv("KIONGA_URL", raising=False)
     output = tmp_path / "training"
     run(str(output))
     artifact = output / MODEL_FILENAME
@@ -1283,9 +1283,9 @@ def build(model: Any = None, checkpointer: Any = None):
     from .tools import project_status
 
     if model is None:
-        from mlaiops_sdk.llm import build_chat_model
+        from kionga.llm import build_chat_model
 
-        model = build_chat_model(backend=os.getenv("MLAIOPS_LLM_BACKEND", "mock"))
+        model = build_chat_model(backend=os.getenv("KIONGA_LLM_BACKEND", "mock"))
     tools = [project_status]
     bound_model = model.bind_tools(tools)
 
@@ -1326,8 +1326,8 @@ class InvokeRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     checkpointer_context = None
-    if os.getenv("MLAIOPS_CHECKPOINT_DSN") or os.getenv("DATABASE_URL"):
-        from mlaiops_sdk.agents import get_langgraph_checkpointer
+    if os.getenv("KIONGA_CHECKPOINT_DSN") or os.getenv("DATABASE_URL"):
+        from kionga.agents import get_langgraph_checkpointer
 
         checkpointer_context = get_langgraph_checkpointer()
         checkpointer = await checkpointer_context.__aenter__()
@@ -1355,7 +1355,7 @@ def health() -> dict[str, str]:
 @app.post("/invoke")
 async def invoke(payload: InvokeRequest, request: Request) -> dict[str, str]:
     from langchain_core.messages import HumanMessage
-    from mlaiops_sdk.tracing import langfuse_handler
+    from kionga.tracing import langfuse_handler
 
     session_id = payload.session_id or str(uuid.uuid4())
     config = {{"configurable": {{"thread_id": session_id}}}}
@@ -1398,7 +1398,7 @@ def remember_project_fact(project_id: str, fact: str) -> None:
     memory, pass the authenticated user as AgentMemoryClient(..., user_id=...).
     Needs the platform memory DSN.
     """
-    from mlaiops_sdk.agents import AgentMemoryClient
+    from kionga.agents import AgentMemoryClient
 
     with AgentMemoryClient("project-agent") as memory:
         memory.remember(fact, metadata={"project_id": project_id}, scope="agent")
@@ -1424,7 +1424,7 @@ def test_health_and_tool_contract():
 
 
 def test_project_facts_are_explicitly_agent_wide_memory(monkeypatch):
-    import mlaiops_sdk.agents as agents
+    import kionga.agents as agents
 
     stored = []
 
@@ -1456,7 +1456,7 @@ def test_graph_is_deterministic_with_injected_model():
 
 
 def test_graph_defaults_to_offline_mock(monkeypatch):
-    monkeypatch.delenv("MLAIOPS_LLM_BACKEND", raising=False)
+    monkeypatch.delenv("KIONGA_LLM_BACKEND", raising=False)
     result = build().invoke({{"messages": [("user", "status?")]}})
     assert result["messages"][-1].content.startswith("[mock] acknowledged:")
 '''
@@ -1942,7 +1942,7 @@ def agents(_: argparse.Namespace) -> None:
 
 def api_get(path: str) -> dict[str, Any]:
     request = urllib.request.Request(KIONGA_URL + path, headers={"Accept": "application/json"})
-    if token := os.getenv("MLAIOPS_TOKEN"):
+    if token := os.getenv("KIONGA_TOKEN"):
         request.add_header("Authorization", f"Bearer {token}")
     try:
         # KIONGA_URL is the control plane the user configured.

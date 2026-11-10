@@ -77,7 +77,7 @@ def test_missing_token_exits_non_zero_and_names_the_variable(tmp_path):
     assert not [call for call in calls if call[0] in ("jupyter", "env", "s3fs")]
 
 
-@pytest.mark.parametrize("token", ["mlaiops-local", "x" * 31, "short"])
+@pytest.mark.parametrize("token", ["kionga-local", "x" * 31, "short"])
 def test_known_default_or_short_token_is_rejected(tmp_path, token):
     result, calls = run_entrypoint(tmp_path, JUPYTER_TOKEN=token, **OPTIONAL_MOUNTS)
     assert result.returncode != 0
@@ -93,10 +93,10 @@ def test_strong_token_starts_jupyter_on_all_interfaces(tmp_path):
     assert "--ip=0.0.0.0" in argv
     assert f"--IdentityProvider.token={STRONG_TOKEN}" in argv
     assert "--ServerApp.trust_xheaders=True" in argv
-    assert not any("mlaiops-local" in argument for argument in argv)
+    assert not any("kionga-local" in argument for argument in argv)
 
 
-@pytest.mark.parametrize("token", ["", "mlaiops-local"])
+@pytest.mark.parametrize("token", ["", "kionga-local"])
 def test_insecure_local_mode_binds_loopback_only(tmp_path, token):
     result, calls = run_entrypoint(tmp_path, JUPYTER_TOKEN=token, KIONGA_ALLOW_INSECURE_LOCAL="true",
                                    KIONGA_JUPYTER_IP="0.0.0.0", **OPTIONAL_MOUNTS)
