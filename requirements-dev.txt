@@ -2,7 +2,7 @@
 # the SDK runtime (FastAPI, LangGraph), scikit-learn and CPU PyTorch.
 # For a sibling SDK checkout instead: pip install -e "../sdk-python[runtime,dev]"
 --extra-index-url https://download.pytorch.org/whl/cpu
-mlaiops-sdk[runtime,dev] @ https://github.com/kiongahq/sdk-python/archive/refs/tags/v0.2.0.tar.gz
+kionga[runtime,dev] @ https://github.com/kiongahq/sdk-python/archive/refs/tags/v0.3.0.tar.gz
 scikit-learn>=1.4
 torch>=2.4
 pytest>=8.0

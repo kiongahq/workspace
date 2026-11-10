@@ -59,7 +59,7 @@ The deployment sets these in each workspace container:
 
 | Variable | Image | Required | Purpose |
 | --- | --- | --- | --- |
-| `JUPYTER_TOKEN` | Jupyter | Yes | JupyterLab login token, at least 32 random characters. The gateway proxies with the same value (`KIONGA_JUPYTER_TOKEN`). The container exits at startup when it is unset, shorter, or the old `mlaiops-local` default. |
+| `JUPYTER_TOKEN` | Jupyter | Yes | JupyterLab login token, at least 32 random characters. The gateway proxies with the same value (`KIONGA_JUPYTER_TOKEN`). The container exits at startup when it is unset, shorter, or the old `kionga-local` default. |
 | `KIONGA_ALLOW_INSECURE_LOCAL` | Jupyter | No | `true` accepts a weak or empty `JUPYTER_TOKEN` on a single-user machine and binds JupyterLab to `127.0.0.1` only, so the platform gateway cannot reach it. Never set it on a shared host. |
 | `KIONGA_JUPYTER_TRUST_XHEADERS` | Jupyter | No | Default `true`: JupyterLab trusts `X-Forwarded-*` headers because the platform gateway is the only ingress. Set `false` when anything else can reach port 8888. |
 | `S3_MOUNT_PREFIX` | Jupyter | When mounting | This workspace's own prefix in every mounted bucket, for example `projects/<namespace>`. Each bucket in `S3_MOUNT_BUCKETS` is mounted as `bucket:/<prefix>`, never whole. With `S3_ENDPOINT` and `/dev/fuse` present, an unset prefix stops the container, unless `S3_MOUNT_OPTIONAL=true`, which skips the mounts. Letters, digits, `.`, `_`, `-` and `/` only, with no `.` or `..` segments. |
@@ -81,14 +81,14 @@ store (AWS IAM, RustFS or MinIO policies), the shape is:
     {
       "Effect": "Allow",
       "Action": ["s3:ListBucket"],
-      "Resource": ["arn:aws:s3:::mlaiops-models", "arn:aws:s3:::mlaiops-artifacts"],
+      "Resource": ["arn:aws:s3:::kionga-models", "arn:aws:s3:::kionga-artifacts"],
       "Condition": {"StringLike": {"s3:prefix": ["projects/<namespace>", "projects/<namespace>/*"]}}
     },
     {
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-      "Resource": ["arn:aws:s3:::mlaiops-models/projects/<namespace>/*",
-                   "arn:aws:s3:::mlaiops-artifacts/projects/<namespace>/*"]
+      "Resource": ["arn:aws:s3:::kionga-models/projects/<namespace>/*",
+                   "arn:aws:s3:::kionga-artifacts/projects/<namespace>/*"]
     }
   ]
 }
