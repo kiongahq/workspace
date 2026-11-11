@@ -3,7 +3,7 @@
 # For a sibling SDK checkout instead: pip install -e "../sdk-python[runtime,dev]"
 --extra-index-url https://download.pytorch.org/whl/cpu
 kionga[runtime,dev] @ https://github.com/kiongahq/sdk-python/archive/refs/tags/v0.3.1.tar.gz
-scikit-learn>=1.4
+scikit-learn>=1.9.1
 torch>=2.4
 pytest>=8.0
 ruff>=0.5
