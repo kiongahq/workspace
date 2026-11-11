@@ -6,4 +6,4 @@ kionga[runtime,dev] @ https://github.com/kiongahq/sdk-python/archive/refs/tags/v
 scikit-learn>=1.4
 torch>=2.4
 pytest>=8.0
-ruff>=0.5
+ruff>=0.17.4
