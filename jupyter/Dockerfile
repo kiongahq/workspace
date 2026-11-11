@@ -49,7 +49,7 @@ RUN apt-get update \
 # PLATFORM_SOURCE is explicit so it is part of the layer cache key: a release
 # build never reuses a layer built from local checkouts.
 ARG PLATFORM_SOURCE=release
-ARG SDK_VERSION=v0.3.0
+ARG SDK_VERSION=v0.3.1
 ARG AGENT_RUNTIME_VERSION=v0.2.0
 ARG PIPELINE_RUNNER_VERSION=v0.2.0
 COPY --from=sdk / /opt/src/sdk/
