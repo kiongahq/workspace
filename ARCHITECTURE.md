@@ -23,7 +23,7 @@ background on loopback before the editor.
 
 ### `workspace/kionga.py`
 
-The `kionga` CLI, standard library only.
+The `kionga` CLI, standard library only; the SDK is imported only to pass a command on.
 
 - `TEMPLATE_CATALOG` is the versioned template catalog (`production-ml`,
   `distributed-training`, `production-agent`, `fullstack-ai`, `blank-python`), with
@@ -37,6 +37,14 @@ The `kionga` CLI, standard library only.
 - `templates` prints the catalog (`--json` for the machine form), `agents` reports
   which coding-agent CLIs are installed, and `project sync` clones or fast-forwards
   a project's connected Git repository through the gateway API.
+- Any other command, such as `kionga apps`, goes to the Kionga Python SDK's command
+  line (`kionga.cli`) with every argument, because the images install this script
+  over the SDK's own `kionga`. `main` imports the SDK lazily and leaves the script's
+  folder off the import path, so a checkout's `workspace/kionga.py` doesn't shadow
+  the package. The SDK gets `KIONGA_URL` defaulted to the same gateway address.
+  When the SDK, or an SDK release with a command line, isn't installed (the IDE
+  image has no SDK), the command says so and exits 1. The workspace's own commands
+  always win a name clash, and `kionga --help` lists the SDK's commands.
 
 ### `workspace/directories.py`
 
