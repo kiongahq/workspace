@@ -2,7 +2,11 @@
 `kionga apps` is passed on to (workspace/kionga.py hands it to kionga.cli)."""
 import importlib.util
 import re
+import urllib.error
+import urllib.request
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[1]
 # The first SDK release with kionga.cli, the `kionga apps` command line.
@@ -65,3 +69,21 @@ def test_the_pinned_sdk_has_the_command_line_kionga_apps_needs():
 def test_the_installed_sdk_provides_kionga_cli():
     # requirements-dev.txt installs the pinned release, so this checks the release itself.
     assert importlib.util.find_spec("kionga.cli") is not None
+
+
+def test_the_ide_digest_is_the_one_the_sdk_release_published():
+    """The release's SHA256SUMS names the wheel's digest. Skipped when GitHub can't be
+    reached, so the gate never depends on the network; CI reaches it."""
+    text = ide_dockerfile()
+    version = re.search(r"^ARG SDK_VERSION=(v[0-9.]+)$", text, re.M).group(1)
+    digest = re.search(r"^ARG SDK_WHEEL_SHA256=([0-9a-f]{64})$", text, re.M).group(1)
+    url = f"https://github.com/kiongahq/sdk-python/releases/download/{version}/SHA256SUMS"
+    try:
+        with urllib.request.urlopen(url, timeout=20) as response:  # fixed https release URL
+            sums = response.read().decode()
+    except (urllib.error.URLError, OSError) as error:
+        pytest.skip(f"cannot reach {url}: {error}")
+    wheel = f"kionga-{version[1:]}-py3-none-any.whl"
+    published = {name.strip().removeprefix("./"): sha for sha, name in
+                 (line.split(None, 1) for line in sums.splitlines() if line.strip())}
+    assert published.get(wheel) == digest, f"SHA256SUMS of {version} lists {published.get(wheel)} for {wheel}"
