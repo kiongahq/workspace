@@ -2051,6 +2051,17 @@ def sdk_commands(cli: Any) -> tuple[str, ...]:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     command = requested_command(argv)
+    sdk_option = any(token == option or token.startswith(option + "=")
+                     for option in SDK_OPTIONS_WITH_VALUES for token in argv)
+    if command is None and sdk_option:
+        # Only the SDK's command line has these options, so `kionga --url X --help`
+        # is a question for it.
+        cli = load_sdk_cli()
+        if cli is None:
+            print(f"kionga: {SDK_MISSING.format(command='--url')}", file=sys.stderr)
+            return 1
+        os.environ.setdefault("KIONGA_URL", KIONGA_URL)
+        return int(cli.main(argv) or 0)
     if command is not None and command not in WORKSPACE_COMMANDS:
         cli = load_sdk_cli()
         if command in sdk_commands(cli):

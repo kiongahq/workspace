@@ -160,3 +160,26 @@ def test_the_installed_script_without_the_sdk_cli_says_so(tmp_path):
     result = run(MODULE_PATH, "apps", "list", sdk=empty)
     assert result.returncode == 1
     assert "comes from the Kionga Python SDK" in result.stderr
+
+
+@pytest.mark.parametrize("argv", [["--url", "http://g", "--help"], ["--url=http://g"]])
+def test_sdk_root_options_without_a_command_go_to_the_sdk(monkeypatch, argv):
+    cli = FakeCli(code=0)
+    monkeypatch.setattr(kionga, "load_sdk_cli", lambda: cli)
+    assert kionga.main(argv) == 0
+    assert cli.calls == [argv]
+
+
+def test_sdk_root_options_without_the_sdk_say_how_to_get_it(monkeypatch, capsys):
+    monkeypatch.setattr(kionga, "load_sdk_cli", lambda: None)
+    assert kionga.main(["--url", "http://g", "--help"]) == 1
+    assert "comes from the Kionga Python SDK" in capsys.readouterr().err
+
+
+def test_plain_help_stays_with_the_workspace_command(monkeypatch, capsys):
+    cli = FakeCli()
+    monkeypatch.setattr(kionga, "load_sdk_cli", lambda: cli)
+    with pytest.raises(SystemExit) as caught:
+        kionga.main(["--help"])
+    assert caught.value.code == 0 and cli.calls == []
+    assert "Kionga AI workspace tools" in capsys.readouterr().out
