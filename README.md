@@ -15,7 +15,8 @@ opens in the browser. This repository builds the workspace images:
   the platform's runnable modules (agents, features, real-time, pipelines) and the
   object store buckets mounted as folders.
 - `ghcr.io/kiongahq/ide`: a browser IDE (code-server) on the same `/workspace`
-  folder. Coding-agent CLIs are optional.
+  folder, with the core Kionga Python SDK (`kionga apps`, `import kionga`).
+  Coding-agent CLIs are optional.
 - `ghcr.io/kiongahq/langflow`: a project-scoped visual flow builder with Kionga
   model, function, storage, and tool components.
 - `ghcr.io/kiongahq/langflow-sidecar`: a loopback API helper that holds the
