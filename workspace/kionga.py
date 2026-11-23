@@ -9,12 +9,14 @@ No credentials are accepted or written by the generator.
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import urllib.error
 import urllib.parse
@@ -1991,8 +1993,86 @@ def project_sync(args: argparse.Namespace) -> None:
     print(f"Cloned {url} to {target} ({branch})")
 
 
-def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(prog="kionga", description="Kionga AI workspace tools")
+# Commands this script owns. Any other command goes to the Kionga Python SDK's
+# command line (kionga.cli), such as `kionga apps`, when the SDK provides it.
+WORKSPACE_COMMANDS = ("scaffold", "templates", "agents", "project")
+SDK_OPTIONS_WITH_VALUES = ("--url",)
+SDK_MISSING = (
+    "`kionga {command}` comes from the Kionga Python SDK, which is not installed here "
+    "or is older than the release that adds it. Install it with `pip install kionga` "
+    "(or a release from https://github.com/kiongahq/sdk-python/releases)."
+)
+
+
+def requested_command(argv: list[str]) -> str | None:
+    """The first argument that is not an option or an option's value."""
+    skip = False
+    for token in argv:
+        if skip:
+            skip = False
+            continue
+        if token in SDK_OPTIONS_WITH_VALUES:
+            skip = True
+            continue
+        if not token.startswith("-"):
+            return token
+    return None
+
+
+def load_sdk_cli() -> Any:
+    """Import the SDK's ``kionga.cli``, or return None when it isn't available.
+
+    Run from a checkout, this script is ``workspace/kionga.py``, which
+    ``import kionga`` would find before the SDK. The script's own folder is left
+    off the search path while importing, so the installed SDK package is found.
+    """
+    here = Path(__file__).resolve().parent
+    saved = list(sys.path)
+    sys.path[:] = [entry for entry in saved if Path(entry or ".").resolve() != here]
+    try:
+        module = importlib.import_module("kionga.cli")
+    except ImportError:
+        return None
+    finally:
+        sys.path[:] = saved
+    return module if callable(getattr(module, "main", None)) else None
+
+
+def sdk_commands(cli: Any) -> tuple[str, ...]:
+    """The subcommands the SDK's command line offers, such as ``apps``."""
+    if cli is None or not callable(getattr(cli, "parser", None)):
+        return ()
+    for action in cli.parser()._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return tuple(action.choices)
+    return ()
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    command = requested_command(argv)
+    if command is not None and command not in WORKSPACE_COMMANDS:
+        cli = load_sdk_cli()
+        if command in sdk_commands(cli):
+            # Both commands talk to the same control plane.
+            os.environ.setdefault("KIONGA_URL", KIONGA_URL)
+            return int(cli.main(argv) or 0)
+        if cli is None:
+            print(f"kionga: {SDK_MISSING.format(command=command)}", file=sys.stderr)
+            return 1
+    arguments = parser(sdk_commands(load_sdk_cli())).parse_args(argv)
+    try:
+        arguments.run(arguments)
+    except (RuntimeError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"kionga: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def parser(sdk: tuple[str, ...] = ()) -> argparse.ArgumentParser:
+    epilog = (f"Kionga SDK commands: {', '.join(sdk)}. Run `kionga <command> --help` for one."
+              if sdk else "Install the Kionga Python SDK for more commands, such as `kionga apps`.")
+    root = argparse.ArgumentParser(prog="kionga", description="Kionga AI workspace tools", epilog=epilog)
     commands = root.add_subparsers(dest="command", required=True)
 
     make = commands.add_parser("scaffold", help="generate a production-shaped codebase")
@@ -2024,8 +2104,4 @@ def parser() -> argparse.ArgumentParser:
 
 
 if __name__ == "__main__":
-    arguments = parser().parse_args()
-    try:
-        arguments.run(arguments)
-    except (RuntimeError, ValueError, subprocess.CalledProcessError) as error:
-        raise SystemExit(f"kionga: {error}") from error
+    sys.exit(main())

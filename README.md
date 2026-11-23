@@ -22,7 +22,8 @@ opens in the browser. This repository builds the workspace images:
   workspace credential outside the Langflow process.
 
 Jupyter and the IDE carry the `kionga` CLI, which generates production-shaped projects from a
-versioned template catalog, and a small sidecar that lets the console create
+versioned template catalog and passes other commands, such as `kionga apps`, on to
+the Kionga Python SDK's command line where the SDK is installed, and a small sidecar that lets the console create
 project folders and lets the SDK reach the platform as the workspace owner.
 
 ## Install
