@@ -28,8 +28,12 @@ RUN if [ "$INSTALL_CODING_AGENTS" = true ]; then \
 # several hundred MB, and generated projects install what they need themselves.
 # The wheel is the one the SDK's release workflow built and attached to the GitHub
 # release, installed by SHA-256 so a moved tag or a swapped asset fails the build.
-# Bookworm's Python is 3.11, the SDK's minimum. System site, like the Jupyter image:
-# a user's `pip install --user` still wins. To move to a new release, change both
+# Bookworm's Python is 3.11, the SDK's minimum. System site, like the Jupyter image.
+# Bookworm marks its Python as externally managed (PEP 668), so a user installs
+# packages in a virtual environment, or with `pip install --user --break-system-packages`
+# into PYTHONUSERBASE, which then wins over this copy. The SDK's own dependencies
+# (httpx, pydantic) resolve to the newest compatible releases at build time, as in the
+# Jupyter image; only the SDK wheel is hash-pinned. To move to a new release, change both
 # ARGs together: the digest is on the release page (SHA256SUMS) and tests/test_sdk_pin.py
 # keeps SDK_VERSION equal to the Jupyter image and the test requirements.
 ARG SDK_VERSION=v0.3.2

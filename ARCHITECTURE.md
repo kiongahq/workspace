@@ -94,8 +94,10 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
   CLI, the sidecar and the core Kionga SDK. The SDK is the release wheel from the
   SDK's GitHub release, installed by SHA-256 (`SDK_VERSION`, `SDK_WHEEL_SHA256`), without
   extras: about 15 MB, against the several hundred MB the Jupyter image's
-  `agents` and `huggingface` extras add. It goes into the system site like Jupyter's,
-  so a user's `pip install --user` wins. `tests/test_sdk_pin.py` keeps its version equal
+  `agents` and `huggingface` extras add. It goes into the system site like Jupyter's; Bookworm's
+  Python is externally managed (PEP 668), so users work in a virtual environment or pass
+  `--break-system-packages` with `--user`. The SDK's dependencies are not hash-pinned,
+  as in the Jupyter image. `tests/test_sdk_pin.py` keeps its version equal
   to the Jupyter image and the test requirements. Coding-agent CLIs install only with
   `INSTALL_CODING_AGENTS=true`.
 - `entrypoint.sh`: keeps editor state and user tools under `/workspace/.kionga/ide`,
