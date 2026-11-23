@@ -42,8 +42,8 @@ The `kionga` CLI, standard library only; the SDK is imported only to pass a comm
   over the SDK's own `kionga`. `main` imports the SDK lazily and leaves the script's
   folder off the import path, so a checkout's `workspace/kionga.py` doesn't shadow
   the package. The SDK gets `KIONGA_URL` defaulted to the same gateway address.
-  When the SDK, or an SDK release with a command line, isn't installed (the IDE
-  image has no SDK), the command says so and exits 1. The workspace's own commands
+  When the SDK, or an SDK release with a command line, isn't installed (a
+  checkout without the SDK), the command says so and exits 1. The workspace's own commands
   always win a name clash, and `kionga --help` lists the SDK's commands.
 
 ### `workspace/directories.py`
@@ -90,8 +90,16 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
 
 ### `ide/`
 
-- `Dockerfile`: `codercom/code-server:4.99.4` with the CLI and sidecar. Coding-agent
-  CLIs install only with `INSTALL_CODING_AGENTS=true`.
+- `Dockerfile`: `codercom/code-server:4.99.4` (Debian bookworm, Python 3.11) with the
+  CLI, the sidecar and the core Kionga SDK. The SDK is the release wheel from the
+  SDK's GitHub release, installed by SHA-256 (`SDK_VERSION`, `SDK_WHEEL_SHA256`), without
+  extras: about 15 MB, against the several hundred MB the Jupyter image's
+  `agents` and `huggingface` extras add. It goes into the system site like Jupyter's; Bookworm's
+  Python is externally managed (PEP 668), so users work in a virtual environment or pass
+  `--break-system-packages` with `--user`. The SDK's dependencies are not hash-pinned,
+  as in the Jupyter image. `tests/test_sdk_pin.py` keeps its version equal
+  to the Jupyter image and the test requirements. Coding-agent CLIs install only with
+  `INSTALL_CODING_AGENTS=true`.
 - `entrypoint.sh`: keeps editor state and user tools under `/workspace/.kionga/ide`,
   starts the sidecar and launches code-server (`KIONGA_IDE_AUTH_MODE`, default
   `password`).
