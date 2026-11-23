@@ -81,7 +81,9 @@ def test_the_ide_digest_is_the_one_the_sdk_release_published():
     try:
         with urllib.request.urlopen(url, timeout=20) as response:  # fixed https release URL
             sums = response.read().decode()
-    except (urllib.error.URLError, OSError) as error:
+    except urllib.error.HTTPError as error:  # GitHub answered: a missing manifest is a failure
+        raise AssertionError(f"{url} answered {error.code}") from error
+    except OSError as error:  # no network (URLError is an OSError): the gate must not depend on it
         pytest.skip(f"cannot reach {url}: {error}")
     wheel = f"kionga-{version[1:]}-py3-none-any.whl"
     published = {name.strip().removeprefix("./"): sha for sha, name in
