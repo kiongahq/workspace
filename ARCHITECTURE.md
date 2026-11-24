@@ -70,7 +70,12 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
 - `Dockerfile`: Python 3.11 with JupyterLab 4, Jupyter AI, pinned MLflow and
   scikit-learn, s3fs, Node.js and the Codex and Claude Code CLIs. It installs the
   SDK and copies `agents`, `features`, `realtime` and `pipelines` into
-  `/opt/platform/python` (on `PYTHONPATH`).
+  `/opt/platform/python` (on `PYTHONPATH`). The SDK's dependencies, with its
+  `agents` and `huggingface` extras, come from `jupyter/sdk-requirements.txt`, which
+  pins each with its SHA-256 and is installed with `--require-hashes`. A release
+  build fails if that file misses a dependency of the SDK or breaks another
+  installed package. The image's other packages (JupyterLab, MLflow, Prefect) are
+  not hash-locked.
 - `platform_sources.py`: fetches those sources, either as tagged GitHub release
   archives (`release`) or from BuildKit named contexts (`local`). It refuses
   non-tag versions, unsafe archive members and a mix of the two modes.
@@ -96,9 +101,10 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
   extras: about 15 MB, against the several hundred MB the Jupyter image's
   `agents` and `huggingface` extras add. It goes into the system site like Jupyter's; Bookworm's
   Python is externally managed (PEP 668), so users work in a virtual environment or pass
-  `--break-system-packages` with `--user`. The SDK's dependencies are not hash-pinned,
-  as in the Jupyter image. `tests/test_sdk_pin.py` keeps its version equal
-  to the Jupyter image and the test requirements. Coding-agent CLIs install only with
+  `--break-system-packages` with `--user`. The SDK's dependencies come from
+  `ide/sdk-requirements.txt`, which pins each with its SHA-256 and is installed with
+  `--require-hashes`. `tests/test_sdk_pin.py` keeps its version equal
+  to the Jupyter image, the test requirements and the lock files. Coding-agent CLIs install only with
   `INSTALL_CODING_AGENTS=true`.
 - `entrypoint.sh`: keeps editor state and user tools under `/workspace/.kionga/ide`,
   starts the sidecar and launches code-server (`KIONGA_IDE_AUTH_MODE`, default
