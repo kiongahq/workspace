@@ -217,6 +217,9 @@ def test_the_lock_script_resolves_the_jupyter_lock_with_every_package_the_image_
         '    "b[x]==2" \\\n && echo "c==3" && pip install "/opt/src/sdk[agents]" "kionga[agents]" "d"\n'
     ) == ["a>=1,<2", "b[x]==2", "d"]
     assert script.image_packages('RUN pip install --require-hashes -r /tmp/lock.txt "a==1"\n') == ["a==1"]
+    assert script.image_packages(
+        'RUN pip install --index-url https://example.test/simple -f /wheels --trusted-host example.test '
+        '-c /tmp/constraints.txt "a==1"\n') == ["a==1"], "an option's value is not a requirement"
     with pytest.raises(SystemExit, match="double quotes"):  # an unquoted requirement must not be missed
         script.image_packages('RUN pip install "a==1" b==2\n')
 

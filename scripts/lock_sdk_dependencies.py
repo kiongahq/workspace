@@ -49,6 +49,18 @@ IDE_LOCK = ROOT / "ide" / "sdk-requirements.txt"
 JUPYTER_LOCK = ROOT / "jupyter" / "sdk-requirements.txt"
 
 
+# `pip install` options whose next word is their value, not a requirement. An option
+# missing here stops the run with "put the pip requirement in double quotes".
+PIP_OPTIONS_WITH_A_VALUE = {
+    "-r", "--requirement", "-c", "--constraint", "-e", "--editable", "-i", "--index-url",
+    "--extra-index-url", "-f", "--find-links", "--trusted-host", "-t", "--target", "--prefix",
+    "--root", "--platform", "--python-version", "--implementation", "--abi", "--only-binary",
+    "--no-binary", "--upgrade-strategy", "--progress-bar", "--cache-dir", "--src", "--cert",
+    "--client-cert", "--proxy", "--retries", "--timeout", "--use-feature", "--config-settings",
+    "-C", "--report", "--root-user-action", "--log", "--exists-action", "--use-deprecated",
+}
+
+
 def sdk_version(dockerfile: str) -> str:
     """The release in `ARG SDK_VERSION=v<release>`, without the v."""
     found = re.search(r"^ARG SDK_VERSION=v([0-9]+\.[0-9]+\.[0-9]+)$", dockerfile, re.M)
@@ -74,9 +86,8 @@ def image_packages(dockerfile: str) -> list[str]:
             quoted = re.findall(r'"([^"]+)"', command)
             words = shlex.split(command)
             words = words[words.index("install") + 1:]
-            takes_value = {"-r", "--requirement", "-c", "--constraint"}
             for index, word in enumerate(words):
-                if word.startswith("-") or (index and words[index - 1] in takes_value):
+                if word.startswith("-") or (index and words[index - 1] in PIP_OPTIONS_WITH_A_VALUE):
                     continue
                 if word not in quoted:
                     raise SystemExit(f"put the pip requirement {word!r} in double quotes: {command.strip()}")
