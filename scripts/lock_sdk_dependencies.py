@@ -32,6 +32,7 @@ first step chose.
 from __future__ import annotations
 
 import re
+import shlex
 import shutil
 import subprocess  # nosec B404
 import sys
@@ -57,10 +58,11 @@ def sdk_version(dockerfile: str) -> str:
 
 
 def image_packages(dockerfile: str) -> list[str]:
-    """Every package requirement the Dockerfile's `pip install` commands name in quotes.
+    """Every package requirement the Dockerfile's `pip install` commands name.
 
-    The SDK itself, paths (its source directory) and URLs are left out: the SDK is
-    added by the caller at the pinned release.
+    The SDK itself and paths (its source directory) are left out: the SDK is added by
+    the caller at the pinned release. A requirement must be in double quotes, as the
+    Dockerfile writes them; an unquoted one stops the run instead of being missed.
     """
     lines = [line for line in dockerfile.replace("\\\n", " ").splitlines()
              if not line.lstrip().startswith("#")]
@@ -69,10 +71,18 @@ def image_packages(dockerfile: str) -> list[str]:
         for command in re.split(r"&&|\|\||;", line):
             if not re.search(r"\bpip install\b", command):
                 continue
-            for spec in re.findall(r'"([^"]+)"', command):
-                name = re.match(r"([A-Za-z0-9][A-Za-z0-9._-]*)(\[[^\]]*\])?\s*(==|>=|<=|~=|!=|<|>|$)", spec)
+            quoted = re.findall(r'"([^"]+)"', command)
+            words = shlex.split(command)
+            words = words[words.index("install") + 1:]
+            takes_value = {"-r", "--requirement", "-c", "--constraint"}
+            for index, word in enumerate(words):
+                if word.startswith("-") or (index and words[index - 1] in takes_value):
+                    continue
+                if word not in quoted:
+                    raise SystemExit(f"put the pip requirement {word!r} in double quotes: {command.strip()}")
+                name = re.match(r"([A-Za-z0-9][A-Za-z0-9._-]*)(\[[^\]]*\])?\s*(==|>=|<=|~=|!=|<|>|$)", word)
                 if name and name.group(1).lower() != "kionga":
-                    packages.append(spec)
+                    packages.append(word)
     return packages
 
 

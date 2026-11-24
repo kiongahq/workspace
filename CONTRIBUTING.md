@@ -111,6 +111,12 @@ linux/amd64 and linux/arm64, so one file serves CI and an Arm laptop. Never edit
 them by hand, and never drop `--require-hashes` to get a build through: a missing
 hash means the lock is stale.
 
+One exception: a Jupyter build from sibling checkouts (`PLATFORM_SOURCE=local`)
+installs the lock first and then installs the SDK checkout normally. The checkout
+is unhashed source already, and it may need a dependency that the pinned release
+does not have, which pip then resolves without a hash. Release builds, the ones CI
+publishes, install nothing for the SDK outside the lock.
+
 ## Commit messages
 
 Use [Conventional Commits](https://www.conventionalcommits.org/), as the history

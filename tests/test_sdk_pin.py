@@ -216,3 +216,18 @@ def test_the_lock_script_resolves_the_jupyter_lock_with_every_package_the_image_
         '# RUN pip install "commented==1"\nRUN pip install --no-cache-dir \\\n    "a>=1,<2" \\\n'
         '    "b[x]==2" \\\n && echo "c==3" && pip install "/opt/src/sdk[agents]" "kionga[agents]" "d"\n'
     ) == ["a>=1,<2", "b[x]==2", "d"]
+    assert script.image_packages('RUN pip install --require-hashes -r /tmp/lock.txt "a==1"\n') == ["a==1"]
+    with pytest.raises(SystemExit, match="double quotes"):  # an unquoted requirement must not be missed
+        script.image_packages('RUN pip install "a==1" b==2\n')
+
+
+def test_a_local_jupyter_build_still_installs_the_lock_before_the_sibling_checkout():
+    """PLATFORM_SOURCE=local installs an unhashed sibling checkout, which may need a
+    dependency newer than the pinned release. The lock still goes in first, in hash
+    checking mode and outside the release/local branch, so both modes start from it."""
+    text = (ROOT / "jupyter" / "Dockerfile").read_text()
+    run = next(line for line in instructions(text) if "-r /tmp/sdk-requirements.txt" in line)
+    lock = run.index("pip install --no-cache-dir --require-hashes -r /tmp/sdk-requirements.txt")
+    assert lock < run.index('if [ "$PLATFORM_SOURCE" = release ]')
+    local = re.search(r'else\s+pip install --no-cache-dir "/opt/src/sdk\[agents,huggingface\]";\s+fi', run)
+    assert local, "the local build installs the checkout normally after the lock"
