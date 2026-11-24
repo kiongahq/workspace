@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.1](https://github.com/kiongahq/workspace/compare/v0.1.0...v0.1.1) (2026-11-24)
+
+
+### Features
+
+* **ide:** install the core Kionga SDK in the IDE image ([#58](https://github.com/kiongahq/workspace/issues/58)) ([5fea9e8](https://github.com/kiongahq/workspace/commit/5fea9e8fc37cce33216f31bb5764ae0fff10d3e3))
+
+
+### Build and dependencies
+
+* install the SDK's dependencies from hash-locked requirements ([7cc574e](https://github.com/kiongahq/workspace/commit/7cc574e35b405437e94c141a6cfcc595ca5cbdee))
+
 ## 0.1.0 (2026-11-23)
 
 
