@@ -48,6 +48,15 @@ RUN apt-get update \
 # pipelines, agents) so notebooks and the terminal can drive the whole stack.
 # PLATFORM_SOURCE is explicit so it is part of the layer cache key: a release
 # build never reuses a layer built from local checkouts.
+# The SDK's dependencies (its agents and huggingface extras included) come from
+# jupyter/sdk-requirements.txt, which pins each one with its SHA-256; --require-hashes
+# makes pip refuse anything without a matching hash. A release build then installs
+# the SDK source with --no-deps, and the --no-index install after it fails the build
+# if the lock no longer covers everything the SDK asks for (it can only use what is
+# already installed). `pip check` fails the build if a locked version breaks a package
+# installed above. A local build installs the sibling checkout normally, so a
+# dependency the checkout has added since the pinned release still resolves.
+# After changing SDK_VERSION run `python scripts/lock_sdk_dependencies.py`.
 ARG PLATFORM_SOURCE=release
 ARG SDK_VERSION=v0.3.2
 ARG AGENT_RUNTIME_VERSION=v0.2.0
@@ -56,10 +65,19 @@ COPY --from=sdk / /opt/src/sdk/
 COPY --from=agent-runtime / /opt/src/agent-runtime/
 COPY --from=pipeline-runner / /opt/src/pipeline-runner/
 COPY jupyter/platform_sources.py /usr/local/lib/kionga_platform_sources.py
+COPY jupyter/sdk-requirements.txt /tmp/sdk-requirements.txt
 RUN SDK_VERSION="$SDK_VERSION" AGENT_RUNTIME_VERSION="$AGENT_RUNTIME_VERSION" \
     PIPELINE_RUNNER_VERSION="$PIPELINE_RUNNER_VERSION" \
     python /usr/local/lib/kionga_platform_sources.py "$PLATFORM_SOURCE" /opt/src \
- && pip install --no-cache-dir "/opt/src/sdk[agents,huggingface]" \
+ && pip install --no-cache-dir --require-hashes -r /tmp/sdk-requirements.txt \
+ && if [ "$PLATFORM_SOURCE" = release ]; then \
+      pip install --no-cache-dir --no-deps "/opt/src/sdk[agents,huggingface]" \
+      && pip install --no-index "kionga[agents,huggingface]" \
+      && pip check; \
+    else \
+      pip install --no-cache-dir "/opt/src/sdk[agents,huggingface]"; \
+    fi \
+ && rm /tmp/sdk-requirements.txt \
  && mkdir -p /opt/platform/python \
  && cp -R /opt/src/agent-runtime/agents /opt/src/agent-runtime/features \
           /opt/src/agent-runtime/realtime /opt/src/pipeline-runner/pipelines \

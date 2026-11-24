@@ -32,14 +32,19 @@ RUN if [ "$INSTALL_CODING_AGENTS" = true ]; then \
 # Bookworm marks its Python as externally managed (PEP 668), so a user installs
 # packages in a virtual environment, or with `pip install --user --break-system-packages`
 # into PYTHONUSERBASE, which then wins over this copy. The SDK's own dependencies
-# (httpx, pydantic) resolve to the newest compatible releases at build time, as in the
-# Jupyter image; only the SDK wheel is hash-pinned. To move to a new release, change both
-# ARGs together: the digest is on the release page (SHA256SUMS) and tests/test_sdk_pin.py
-# keeps SDK_VERSION equal to the Jupyter image and the test requirements.
+# (httpx, pydantic and theirs) come from ide/sdk-requirements.txt, which pins each one
+# with its SHA-256. --require-hashes makes pip refuse anything without a matching hash,
+# so a dependency missing from that file fails the build instead of being resolved.
+# To move to a new release, change both ARGs together, then run
+# `python scripts/lock_sdk_dependencies.py`: the digest is on the release page
+# (SHA256SUMS) and tests/test_sdk_pin.py keeps SDK_VERSION equal to the Jupyter image,
+# the test requirements and the lock files.
 ARG SDK_VERSION=v0.3.2
 ARG SDK_WHEEL_SHA256=06ffdb0b7e642c802917894dd50aec2a050f900c910d44abed73c4dfb1bc3b70
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    "kionga @ https://github.com/kiongahq/sdk-python/releases/download/${SDK_VERSION}/kionga-${SDK_VERSION#v}-py3-none-any.whl#sha256=${SDK_WHEEL_SHA256}"
+COPY ide/sdk-requirements.txt /tmp/sdk-requirements.txt
+RUN python3 -m pip install --no-cache-dir --break-system-packages --require-hashes -r /tmp/sdk-requirements.txt \
+    "kionga @ https://github.com/kiongahq/sdk-python/releases/download/${SDK_VERSION}/kionga-${SDK_VERSION#v}-py3-none-any.whl#sha256=${SDK_WHEEL_SHA256}" \
+ && rm /tmp/sdk-requirements.txt
 
 COPY workspace/kionga.py /usr/local/bin/kionga
 COPY workspace/directories.py /usr/local/lib/kionga_workspace_directories.py

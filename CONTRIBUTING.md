@@ -85,6 +85,38 @@ trained in a notebook loads where it is served. Change all three together. When
 the SDK, agent-runtime or pipeline-runner publish a release you need, bump the
 matching build argument and the SDK pin in `requirements-dev.txt`.
 
+## Bump the SDK
+
+Both images install the SDK's dependencies from hash-locked files,
+`ide/sdk-requirements.txt` and `jupyter/sdk-requirements.txt`, with
+`pip install --require-hashes`. To move to a new SDK release:
+
+1. Set `SDK_VERSION` in `jupyter/Dockerfile` and `ide/Dockerfile`, and the tag in
+   `requirements-dev.txt`.
+2. Set `SDK_WHEEL_SHA256` in `ide/Dockerfile` to the wheel's digest from the
+   release's `SHA256SUMS`.
+3. Regenerate both lock files:
+
+   ```bash
+   pip install uv
+   python scripts/lock_sdk_dependencies.py
+   ```
+
+`tests/test_sdk_pin.py` fails until all of these name the same release. Run the
+same command without a version change to pick up newer releases of the SDK's
+dependencies, and after changing a package that `jupyter/Dockerfile` installs with
+`pip`: the Jupyter lock is resolved together with those packages so
+that it never pins a version one of them refuses. The lock files carry hashes for
+linux/amd64 and linux/arm64, so one file serves CI and an Arm laptop. Never edit
+them by hand, and never drop `--require-hashes` to get a build through: a missing
+hash means the lock is stale.
+
+One exception: a Jupyter build from sibling checkouts (`PLATFORM_SOURCE=local`)
+installs the lock first and then installs the SDK checkout normally. The checkout
+is unhashed source already, and it may need a dependency that the pinned release
+does not have, which pip then resolves without a hash. Release builds, the ones CI
+publishes, install nothing for the SDK outside the lock.
+
 ## Commit messages
 
 Use [Conventional Commits](https://www.conventionalcommits.org/), as the history
