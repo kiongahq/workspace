@@ -234,3 +234,129 @@ def test_a_local_jupyter_build_still_installs_the_lock_before_the_sibling_checko
     assert lock < run.index('if [ "$PLATFORM_SOURCE" = release ]')
     local = re.search(r'else\s+pip install --no-cache-dir "/opt/src/sdk\[agents,huggingface\]";\s+fi', run)
     assert local, "the local build installs the checkout normally after the lock"
+
+
+# The Jupyter image's own packages. Before the image lock they were installed
+# unpinned, so a CI build reused a cached layer with prefect 3.9.4 (websockets<17)
+# while the SDK lock had been resolved against prefect 3.9.5 and pinned
+# websockets 17.4: the release build's `pip check` failed.
+IMAGE_LOCK = ROOT / "jupyter" / "image-requirements.txt"
+
+
+def jupyter_dockerfile() -> str:
+    return (ROOT / "jupyter" / "Dockerfile").read_text()
+
+
+def specifier_holds(spec: str, installed: str) -> bool:
+    from packaging.requirements import Requirement
+    return Requirement(spec).specifier.contains(installed, prereleases=True)
+
+
+# The image: python:3.11-slim on linux/amd64 and linux/arm64.
+IMAGE_ENVIRONMENTS = [{"python_version": "3.11", "python_full_version": "3.11.13", "sys_platform": "linux",
+                       "platform_system": "Linux", "os_name": "posix", "implementation_name": "cpython",
+                       "platform_python_implementation": "CPython", "platform_machine": machine}
+                      for machine in ("x86_64", "aarch64")]
+
+
+def image_lock_pins(environment: dict) -> dict[str, str]:
+    """Package to version for the entries of the image lock that apply in one image
+    environment. A universal lock may list a package once per marker range; exactly
+    one entry may apply in any environment."""
+    from packaging.markers import Marker
+    pins: dict[str, str] = {}
+    for name, version, marker in re.findall(
+            r"^([a-z0-9][a-z0-9._-]*)==([^\s;]+)(?: ; ([^\\]+?))? \\$", IMAGE_LOCK.read_text(), re.M):
+        if marker and not Marker(marker).evaluate(environment):
+            continue
+        assert name not in pins, f"two entries of {name} apply on {environment['platform_machine']}"
+        pins[name] = version
+    return pins
+
+
+def image_lock_entries() -> list[tuple[str, list[str]]]:
+    """Each requirement line of the image lock with its hash lines. Fails on any line
+    that is neither a comment, a pinned requirement nor a hash."""
+    entries: list[tuple[str, list[str]]] = []
+    for number, line in enumerate(IMAGE_LOCK.read_text().splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith(" "):
+            assert entries, f"line {number} continues nothing: {line!r}"
+            assert re.fullmatch(r"\s+--hash=sha256:[0-9a-f]{64}( \\)?", line), f"line {number}: {line!r}"
+            entries[-1][1].append(line)
+            continue
+        assert re.fullmatch(r"[a-z0-9][a-z0-9._-]*==[A-Za-z0-9.!+_-]+( ; [^\\]+)? \\", line), (
+            f"line {number} is not a pinned requirement followed by hashes: {line!r}")
+        entries.append((line, []))
+    return entries
+
+
+def test_the_image_lock_names_the_pinned_sdk_release_and_is_fully_hashed():
+    text = IMAGE_LOCK.read_text()
+    described = re.search(r"resolved together with the Kionga SDK\n# v([0-9.]+) ", text)
+    assert described and described.group(1) == pins()[0], (
+        "jupyter/image-requirements.txt was generated for another SDK release; "
+        "run python scripts/lock_sdk_dependencies.py")
+    entries = image_lock_entries()
+    assert entries and all(hashes for _, hashes in entries), "every package needs a --hash line"
+    assert not any(line.startswith("kionga==") for line, _ in entries)
+
+
+@pytest.mark.parametrize("environment", IMAGE_ENVIRONMENTS, ids=lambda e: e["platform_machine"])
+def test_the_image_lock_satisfies_every_package_the_dockerfile_names(environment):
+    versions = image_lock_pins(environment)
+    for spec in lock_script().image_packages(jupyter_dockerfile()):
+        name = re.split(r"[=<>!~\[ ]", spec)[0].lower().replace("_", "-")
+        assert name in versions, f"{name} is not in jupyter/image-requirements.txt"
+        assert specifier_holds(spec, versions[name]), f"the lock pins {name} {versions[name]}, the image needs {spec}"
+
+
+@pytest.mark.parametrize("environment", IMAGE_ENVIRONMENTS, ids=lambda e: e["platform_machine"])
+def test_the_sdk_lock_and_the_image_lock_agree_on_every_shared_package(environment):
+    image = image_lock_pins(environment)
+    sdk = dict(re.findall(r"^([a-z0-9][a-z0-9._-]*)==([^\s;]+)", lock_text("jupyter"), re.M))
+    different = {name: (version, image.get(name)) for name, version in sdk.items()
+                 if name in image and image[name] != version}
+    assert not different, f"regenerate both locks together: {different}"
+
+
+def pip_command(command: str) -> list[str]:
+    """The words of one pip install, from `pip` on (drops RUN, else and the like)."""
+    words = command.split()
+    return words[words.index("pip"):]
+
+
+# The two installs of the SDK source the build fetched (platform_sources.py), the
+# only pip installs allowed without --require-hashes or --no-index. The release one
+# has --no-deps, so it can add nothing but the SDK; the local one installs the
+# sibling checkout and may resolve a dependency the pinned release lacks.
+SDK_SOURCE_INSTALLS = [
+    ["pip", "install", "--no-cache-dir", "--no-deps", '"/opt/src/sdk[agents,huggingface]"'],
+    ["pip", "install", "--no-cache-dir", '"/opt/src/sdk[agents,huggingface]"'],
+]
+
+
+def test_the_jupyter_image_downloads_nothing_unhashed_in_a_release_build():
+    """Every pip install either checks hashes or cannot reach an index. --no-deps
+    alone is not enough: it still downloads the named package. Only the SDK source
+    installs are exempt, by their exact words."""
+    for command in pip_installs(jupyter_dockerfile()):
+        words = pip_command(command)
+        assert "--require-hashes" in words or "--no-index" in words or words in SDK_SOURCE_INSTALLS, (
+            f"unlocked install in jupyter/Dockerfile: {command}")
+
+
+def test_the_image_installs_its_packages_from_the_lock_before_anything_else():
+    text = jupyter_dockerfile()
+    lines = instructions(text)
+    copy = lines.index("COPY jupyter/image-requirements.txt /tmp/image-requirements.txt")
+    run = next(i for i, line in enumerate(lines) if "-r /tmp/image-requirements.txt" in line)
+    assert copy < run, "the lock must be copied in its own layer key before it is installed"
+    first_pip = next(i for i, line in enumerate(lines) if line.startswith("RUN ") and "pip install" in line)
+    assert run == first_pip, "the image lock must be the first pip install"
+    installs = [pip_command(c) for c in pip_installs(text) if "/tmp/image-requirements.txt" in c or '"mlflow==' in c]
+    assert installs[0][:6] == ["pip", "install", "--no-cache-dir", "--require-hashes", "-r",
+                               "/tmp/image-requirements.txt"]
+    assert installs[1][:4] == ["pip", "install", "--no-index", "--no-deps"], (
+        "the named packages must be checked against what the lock installed, never downloaded")

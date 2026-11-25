@@ -74,8 +74,12 @@ reachable only through the editor's own authenticated port proxy (`/proxy/8890`)
   `agents` and `huggingface` extras, come from `jupyter/sdk-requirements.txt`, which
   pins each with its SHA-256 and is installed with `--require-hashes`. A release
   build fails if that file misses a dependency of the SDK or breaks another
-  installed package. The image's other packages (JupyterLab, MLflow, Prefect) are
-  not hash-locked.
+  installed package. The image's own packages (JupyterLab, MLflow, Prefect, Jupyter
+  AI and their dependencies) come from `jupyter/image-requirements.txt`, hash-locked
+  in the same way and resolved together with the SDK, so a build never picks a
+  version at build time or reuses an older cached install. The SDK source itself is
+  not hash-checked: `platform_sources.py` downloads its tag archive, which has no
+  published digest, and pip installs it with `--no-deps`.
 - `platform_sources.py`: fetches those sources, either as tagged GitHub release
   archives (`release`) or from BuildKit named contexts (`local`). It refuses
   non-tag versions, unsafe archive members and a mix of the two modes.
