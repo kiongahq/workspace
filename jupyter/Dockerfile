@@ -22,7 +22,8 @@ RUN apt-get update \
  && printf 'user_allow_other\n' >> /etc/fuse.conf \
  && rm -rf /var/lib/apt/lists/*
 
-# Every Python package of the image comes from jupyter/image-requirements.txt,
+# Every Python package of the image except the SDK source (fetched below) comes
+# from jupyter/image-requirements.txt,
 # hash-locked and resolved together with the pinned SDK release by
 # `python scripts/lock_sdk_dependencies.py`. The list below names what the image
 # needs; the --no-index install can only use what the lock installed, so it fails

@@ -327,14 +327,23 @@ def pip_command(command: str) -> list[str]:
     return words[words.index("pip"):]
 
 
+# The two installs of the SDK source the build fetched (platform_sources.py), the
+# only pip installs allowed without --require-hashes or --no-index. The release one
+# has --no-deps, so it can add nothing but the SDK; the local one installs the
+# sibling checkout and may resolve a dependency the pinned release lacks.
+SDK_SOURCE_INSTALLS = [
+    ["pip", "install", "--no-cache-dir", "--no-deps", '"/opt/src/sdk[agents,huggingface]"'],
+    ["pip", "install", "--no-cache-dir", '"/opt/src/sdk[agents,huggingface]"'],
+]
+
+
 def test_the_jupyter_image_downloads_nothing_unhashed_in_a_release_build():
-    """Every pip install either checks hashes or cannot reach an index; the only
-    exception is the local build's sibling checkout. Nothing resolves a version at
-    build time."""
+    """Every pip install either checks hashes or cannot reach an index. --no-deps
+    alone is not enough: it still downloads the named package. Only the SDK source
+    installs are exempt, by their exact words."""
     for command in pip_installs(jupyter_dockerfile()):
         words = pip_command(command)
-        local = words == ["pip", "install", "--no-cache-dir", '"/opt/src/sdk[agents,huggingface]"']
-        assert "--require-hashes" in words or "--no-index" in words or "--no-deps" in words or local, (
+        assert "--require-hashes" in words or "--no-index" in words or words in SDK_SOURCE_INSTALLS, (
             f"unlocked install in jupyter/Dockerfile: {command}")
 
 

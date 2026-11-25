@@ -109,7 +109,9 @@ dependencies, and after changing a package that `jupyter/Dockerfile` names in it
 `pip install --no-index --no-deps` list: the image lock and the Jupyter SDK lock
 are resolved together with those packages, so neither pins a version one of them
 refuses, and the image installs exactly the versions the SDK lock was checked
-against. The lock files carry hashes for
+against. The SDK source is the one thing outside the locks: the Jupyter image
+installs the release's tag archive, which has no published digest, with
+`--no-deps`. The lock files carry hashes for
 linux/amd64 and linux/arm64, so one file serves CI and an Arm laptop. Never edit
 them by hand, and never drop `--require-hashes` to get a build through: a missing
 hash means the lock is stale.
