@@ -58,7 +58,7 @@ RUN apt-get update \
 # dependency the checkout has added since the pinned release still resolves.
 # After changing SDK_VERSION run `python scripts/lock_sdk_dependencies.py`.
 ARG PLATFORM_SOURCE=release
-ARG SDK_VERSION=v0.3.2
+ARG SDK_VERSION=v0.3.3
 ARG AGENT_RUNTIME_VERSION=v0.2.0
 ARG PIPELINE_RUNNER_VERSION=v0.2.0
 COPY --from=sdk / /opt/src/sdk/

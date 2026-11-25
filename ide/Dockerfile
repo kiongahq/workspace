@@ -39,8 +39,8 @@ RUN if [ "$INSTALL_CODING_AGENTS" = true ]; then \
 # `python scripts/lock_sdk_dependencies.py`: the digest is on the release page
 # (SHA256SUMS) and tests/test_sdk_pin.py keeps SDK_VERSION equal to the Jupyter image,
 # the test requirements and the lock files.
-ARG SDK_VERSION=v0.3.2
-ARG SDK_WHEEL_SHA256=06ffdb0b7e642c802917894dd50aec2a050f900c910d44abed73c4dfb1bc3b70
+ARG SDK_VERSION=v0.3.3
+ARG SDK_WHEEL_SHA256=7b2db8885ac1fbc0a3554d6a2c168e566be820235b0e9d12a179d51e6ad314e2
 COPY ide/sdk-requirements.txt /tmp/sdk-requirements.txt
 RUN python3 -m pip install --no-cache-dir --break-system-packages --require-hashes -r /tmp/sdk-requirements.txt \
     "kionga @ https://github.com/kiongahq/sdk-python/releases/download/${SDK_VERSION}/kionga-${SDK_VERSION#v}-py3-none-any.whl#sha256=${SDK_WHEEL_SHA256}" \
