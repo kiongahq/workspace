@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/kiongahq/workspace/compare/v0.1.1...v0.1.2) (2026-11-25)
+
+
+### Build and dependencies
+
+* **jupyter:** use SDK v0.3.3 and hash-lock every image package ([a843a3a](https://github.com/kiongahq/workspace/commit/a843a3af719aabca4959cbed54daacfea2058bf8))
+
 ## [0.1.1](https://github.com/kiongahq/workspace/compare/v0.1.0...v0.1.1) (2026-11-24)
 
 
