@@ -88,14 +88,15 @@ matching build argument and the SDK pin in `requirements-dev.txt`.
 ## Bump the SDK
 
 Both images install the SDK's dependencies from hash-locked files,
-`ide/sdk-requirements.txt` and `jupyter/sdk-requirements.txt`, with
-`pip install --require-hashes`. To move to a new SDK release:
+`ide/sdk-requirements.txt` and `jupyter/sdk-requirements.txt`, and the Jupyter
+image installs all its own packages from `jupyter/image-requirements.txt`, each
+with `pip install --require-hashes`. To move to a new SDK release:
 
 1. Set `SDK_VERSION` in `jupyter/Dockerfile` and `ide/Dockerfile`, and the tag in
    `requirements-dev.txt`.
 2. Set `SDK_WHEEL_SHA256` in `ide/Dockerfile` to the wheel's digest from the
    release's `SHA256SUMS`.
-3. Regenerate both lock files:
+3. Regenerate the lock files:
 
    ```bash
    pip install uv
@@ -104,9 +105,11 @@ Both images install the SDK's dependencies from hash-locked files,
 
 `tests/test_sdk_pin.py` fails until all of these name the same release. Run the
 same command without a version change to pick up newer releases of the SDK's
-dependencies, and after changing a package that `jupyter/Dockerfile` installs with
-`pip`: the Jupyter lock is resolved together with those packages so
-that it never pins a version one of them refuses. The lock files carry hashes for
+dependencies, and after changing a package that `jupyter/Dockerfile` names in its
+`pip install --no-index --no-deps` list: the image lock and the Jupyter SDK lock
+are resolved together with those packages, so neither pins a version one of them
+refuses, and the image installs exactly the versions the SDK lock was checked
+against. The lock files carry hashes for
 linux/amd64 and linux/arm64, so one file serves CI and an Arm laptop. Never edit
 them by hand, and never drop `--require-hashes` to get a build through: a missing
 hash means the lock is stale.

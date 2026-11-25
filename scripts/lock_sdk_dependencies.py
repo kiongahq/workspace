@@ -7,12 +7,14 @@ Run it after changing SDK_VERSION (and SDK_WHEEL_SHA256) in the Dockerfiles, or 
 pick up newer releases of the SDK's dependencies. It needs `uv` on PATH
 (`pip install uv`) and network access to PyPI and GitHub.
 
-It writes two files, each the full dependency closure of the pinned SDK release with
-a SHA-256 for every file of every package, which the Dockerfiles install with
-`pip install --require-hashes`:
+It writes three files, each with a SHA-256 for every file of every package, which
+the Dockerfiles install with `pip install --require-hashes`:
 
-  ide/sdk-requirements.txt      the core SDK (httpx, pydantic and theirs)
-  jupyter/sdk-requirements.txt  the SDK with the agents and huggingface extras
+  ide/sdk-requirements.txt        the core SDK's closure (httpx, pydantic and theirs)
+  jupyter/sdk-requirements.txt    the SDK's closure with the agents and huggingface extras
+  jupyter/image-requirements.txt  everything the Jupyter image installs with pip
+                                  (JupyterLab, MLflow, Prefect, Jupyter AI and their
+                                  closures, the SDK's closure included)
 
 The SDK itself is left out of both: the IDE image installs its release wheel by
 digest and the Jupyter image installs the tagged source.
@@ -26,7 +28,10 @@ Prefect and others before the SDK, and they share packages with the SDK's closur
 (websockets, packaging, protobuf). Resolving the SDK alone can pick a version one of
 them refuses. So the first step resolves the SDK together with every package the
 Dockerfile installs, and the second locks the SDK's closure to the versions the
-first step chose.
+first step chose. The first step's result, hashed, is also the image lock: the image
+installs its own packages from it, so the versions the SDK lock was checked against
+are the versions the image runs. An unpinned install would let a build reuse an older
+cached layer or pick a newer release than the lock was resolved with.
 """
 
 from __future__ import annotations
@@ -47,6 +52,7 @@ ARCHIVE = "https://github.com/kiongahq/sdk-python/archive/refs/tags/v{v}.tar.gz"
 JUPYTER_EXTRAS = "agents,huggingface"
 IDE_LOCK = ROOT / "ide" / "sdk-requirements.txt"
 JUPYTER_LOCK = ROOT / "jupyter" / "sdk-requirements.txt"
+IMAGE_LOCK = ROOT / "jupyter" / "image-requirements.txt"
 
 
 # `pip install` options whose next word is their value, not a requirement. An option
@@ -136,10 +142,17 @@ def main() -> int:
             raise SystemExit("found no pip packages in jupyter/Dockerfile")
         (work / "image.in").write_text("\n".join([sdk, *packages]) + "\n")
         uv(work, "image.in", "--output-file", "jupyter-image-packages.txt")
+        uv(work, "image.in", "--generate-hashes", "--no-emit-package", "kionga",
+           "--output-file", "image-lock.txt")
+        IMAGE_LOCK.write_text(
+            f"# Hash-locked packages of the Jupyter image, resolved together with the Kionga SDK\n"
+            f"# v{version} (extras {JUPYTER_EXTRAS}), installed by jupyter/Dockerfile with\n"
+            f"# `pip install --require-hashes`. Do not edit by hand.\n"
+            f"# Regenerate with: {COMMAND}\n" + (work / "image-lock.txt").read_text())
         lock(work, sdk, JUPYTER_LOCK,
              header(version, f"extras {JUPYTER_EXTRAS}", "jupyter/Dockerfile"),
              "--constraint", "jupyter-image-packages.txt")
-    for path in (IDE_LOCK, JUPYTER_LOCK):
+    for path in (IDE_LOCK, JUPYTER_LOCK, IMAGE_LOCK):
         print(f"wrote {path.relative_to(ROOT)}")
     return 0
 

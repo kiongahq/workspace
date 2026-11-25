@@ -22,7 +22,18 @@ RUN apt-get update \
  && printf 'user_allow_other\n' >> /etc/fuse.conf \
  && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir \
+# Every Python package of the image comes from jupyter/image-requirements.txt,
+# hash-locked and resolved together with the pinned SDK release by
+# `python scripts/lock_sdk_dependencies.py`. The list below names what the image
+# needs; the --no-index install can only use what the lock installed, so it fails
+# the build if the lock no longer satisfies one of them. Copying the lock makes it
+# part of the layer cache key: a new lock never reuses an older install.
+# jupyter-server-proxy exposes the loopback workspace sidecar at
+# /workspaces/workbench/proxy/8890 behind the notebook token, the same way
+# code-server's /proxy/8890 does for the IDE (structured scaffold jobs).
+COPY jupyter/image-requirements.txt /tmp/image-requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r /tmp/image-requirements.txt \
+ && pip install --no-index --no-deps \
     "jupyterlab>=4.2,<5" \
     "scikit-learn==1.7.0" \
     "mlflow==3.17.2" \
@@ -30,7 +41,10 @@ RUN pip install --no-cache-dir \
     "pyarrow>=16" \
     "boto3>=1.34" \
     "prefect>=3.0" \
-    "redis>=5"
+    "redis>=5" \
+    "jupyter-ai==3.0.1" \
+    "jupyter-server-proxy==4.4.0" \
+ && rm /tmp/image-requirements.txt
 
 ARG TARGETARCH
 ARG NODE_VERSION=22.17.0
@@ -83,11 +97,6 @@ RUN SDK_VERSION="$SDK_VERSION" AGENT_RUNTIME_VERSION="$AGENT_RUNTIME_VERSION" \
           /opt/src/agent-runtime/realtime /opt/src/pipeline-runner/pipelines \
           /opt/platform/python/ \
  && rm -rf /opt/src
-RUN pip install --no-cache-dir "jupyter-ai==3.0.1"
-# jupyter-server-proxy exposes the loopback workspace sidecar at
-# /workspaces/workbench/proxy/8890 behind the notebook token, the same way
-# code-server's /proxy/8890 does for the IDE (structured scaffold jobs).
-RUN pip install --no-cache-dir "jupyter-server-proxy==4.4.0"
 
 COPY jupyter/quickstart.ipynb /opt/seed/quickstart.ipynb
 COPY jupyter/entrypoint.sh /usr/local/bin/workbench
